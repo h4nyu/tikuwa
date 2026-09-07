@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>在庫管理</title>
+  <meta name="theme-color" content="#1f7a5c" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="/icons/icon.svg" />
+  <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <h1 id="page-title">在庫一覧</h1>
+    </header>
+
+    <main id="view-root">
+      <section id="view-list" class="view">
+        <div class="search-bar">
+          <input id="search-input" type="search" placeholder="商品名・カテゴリ・バーコードで検索" autocomplete="off" />
+        </div>
+        <ul id="product-list" class="product-list"></ul>
+        <p id="list-empty" class="empty-state" hidden>商品がありません。右下の + から登録してください。</p>
+      </section>
+
+      <section id="view-scan" class="view" hidden>
+        <div id="scan-reader" class="scan-reader"></div>
+        <p id="scan-hint" class="scan-hint">バーコードをカメラに写してください</p>
+        <div id="scan-result" class="scan-result-panel" hidden></div>
+      </section>
+
+      <section id="view-replenishment" class="view" hidden>
+        <p class="section-desc">目標在庫数に対して不足している商品です。</p>
+        <ul id="replenishment-list" class="product-list"></ul>
+        <p id="replenishment-empty" class="empty-state" hidden>補充が必要な商品はありません。</p>
+      </section>
+    </main>
+
+    <button id="fab-add" class="fab" aria-label="商品を追加">+</button>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-view="list" data-title="在庫一覧">
+        <span class="nav-icon">📋</span><span>一覧</span>
+      </button>
+      <button class="nav-btn" data-view="scan" data-title="バーコードスキャン">
+        <span class="nav-icon">📷</span><span>スキャン</span>
+      </button>
+      <button class="nav-btn" data-view="replenishment" data-title="補充リスト">
+        <span class="nav-icon">🛒</span><span>補充</span>
+      </button>
+    </nav>
+
+    <div id="modal-backdrop" class="modal-backdrop" hidden>
+      <div id="modal" class="modal" role="dialog" aria-modal="true"></div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
+  </div>
+
+  <script type="module" src="/src/app.ts"></script>
+</body>
+</html>

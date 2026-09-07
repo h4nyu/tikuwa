@@ -1,0 +1,15 @@
+{
+  "name": "@tikuwa/db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SQLite(better-sqlite3)によるProductRepository実装",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@tikuwa/core": "workspace:*",
+    "better-sqlite3": "^13.0.3"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0"
+  }
+}

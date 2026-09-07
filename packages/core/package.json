@@ -1,0 +1,8 @@
+{
+  "name": "@tikuwa/core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ドメイン型と純粋ロジック(フレームワーク非依存)",
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

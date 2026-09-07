@@ -1,0 +1,26 @@
+services:
+  # 一時的なコマンド実行用(型チェック・ビルド・証明書生成など)。
+  # ソースをbind mountするのでイメージ再ビルド無しでコードの変更が反映される。
+  # 例: docker compose run --rm app pnpm run gen-cert
+  app:
+    build: .
+    network_mode: host
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+
+  # 常駐する本番プロセス。ソースはbind mountせず、イメージに焼き込んだものだけを使う
+  # (soltrkでの教訓: 本番でwatchモード相当のbind mountをすると意図しない再起動を招く)。
+  # コードを更新したら `docker compose up -d --build tikuwa` で明示的に再デプロイする。
+  tikuwa:
+    build: .
+    image: tikuwa:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./data:/app/data
+      - ./certs:/app/certs
+    environment:
+      - PORT=3000
+      - HTTPS_PORT=3443

@@ -1,0 +1,14 @@
+{
+  "name": "@tikuwa/server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hono合成ルート(env読み込み・DI・エントリポイント)",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@tikuwa/core": "workspace:*",
+    "@tikuwa/db": "workspace:*",
+    "hono": "^4.13.7",
+    "selfsigned": "^5.5.0"
+  }
+}

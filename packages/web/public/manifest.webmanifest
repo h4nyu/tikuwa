@@ -1,0 +1,12 @@
+{
+  "name": "在庫管理",
+  "short_name": "在庫管理",
+  "description": "自宅の在庫を管理するアプリ",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f6f5",
+  "theme_color": "#1f7a5c",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

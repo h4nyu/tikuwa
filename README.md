@@ -1,0 +1,103 @@
+# tikuwa — 家庭用在庫管理PWA
+
+スマホのカメラでバーコードをスキャンして、自宅の在庫を管理するアプリ。
+Raspberry Pi上で常時起動し、同じLAN内のスマホからブラウザ(PWA)でアクセスする構成。
+
+## 構成
+
+npm workspacesならぬ pnpm workspaces によるモノレポ。ports & adapters的にパッケージを分割している。
+
+```
+packages/
+  core/    ドメイン型・純粋ロジック(Product, StockTransaction, 在庫計算)。フレームワーク非依存。
+  db/      ProductRepositoryのSQLite実装(better-sqlite3)。
+  server/  Hono合成ルート(env読み込み・DI・HTTPS/HTTPサーバー起動)。
+  web/     スマホ向けPWAフロントエンド(Vite + TypeScript + html5-qrcode)。
+```
+
+- サーバー: [Hono](https://hono.dev/) + `@hono/node-server`
+- DB: SQLite(`better-sqlite3`)、`data/tikuwa.db` に保存
+- フロント: Vite + TypeScript(バンドルなしの素のDOM操作、フレームワーク無し)
+- 型チェック: `core`/`db`/`server` はルートの単一`tsconfig.json`で1プログラムとして検査(ビルドはせず`tsx`で直接実行)。`web`はDOM/ESM前提のため別`tsconfig.json`でVite側がビルドする。
+
+## ローカル開発
+
+```bash
+pnpm install
+
+# サーバー(API + 静的ファイル配信)を起動
+pnpm run dev            # tsx watch で自動再起動
+
+# フロントをHMR付きで開発する場合は別ターミナルで
+pnpm --filter @tikuwa/web run dev   # http://localhost:5173 (APIは/apiをlocalhost:3000にプロキシ)
+```
+
+- `pnpm run typecheck` … core/db/server の型チェック
+- `pnpm run typecheck:web` … web の型チェック
+- `pnpm run build:web` … web をビルドして `packages/web/dist` に出力(本番のserverはここを配信する)
+
+## HTTPS(カメラでバーコードを読むために必須)
+
+スマホのブラウザで`getUserMedia`(カメラ)を使うにはHTTPS接続が必要。LAN内の自己署名証明書を生成する:
+
+```bash
+pnpm run gen-cert
+```
+
+`certs/key.pem` / `certs/cert.pem` が作られ、次回起動時から自動的にHTTPS(既定:3443番ポート)も立ち上がる。
+スマホでの初回アクセス時は証明書の警告が出るので、「詳細設定」→「このサイトにアクセスする」等で進めば利用できる。
+
+## Raspberry Piへのデプロイ(Docker Compose)
+
+Piにデプロイキー(読み取り専用のSSH鍵)を登録し、`git pull`でコードを取得する運用にする(scpでの上書きはコミット履歴と実体がズレるため避ける)。
+
+```bash
+# Pi上で最初の1回
+git clone git@github.com:h4nyu/tikuwa.git
+cd tikuwa
+
+# 証明書を生成(初回のみ)
+docker compose run --rm app pnpm run gen-cert
+
+# 本番起動(再起動しても自動復帰する)
+docker compose up -d --build tikuwa
+```
+
+- `docker-compose.yml`は`network_mode: host`を使う(Linux専用。Raspberry Pi OSはLinuxなのでOK)。
+  - ホストネットワークにすることで、証明書のSAN(接続先IP)にPi自身のLAN IPをそのまま含められ、
+    ポートマッピングの設定も不要になる。
+  - **Mac上のDocker Desktopではhost networkingが機能しないため、ローカル動作確認は`docker run -p ...`などポートマッピングで行うこと**(README内の開発コマンドはこの前提)。
+- `app`サービスはソースをbind mountした使い捨て実行用(`docker compose run --rm app <command>`で型チェックやスクリプトを走らせる)。
+- `tikuwa`サービスが本番の常駐プロセス。ソースはbind mountせず、**ビルド時にイメージへ焼き込んだコードだけ**が動く
+  (稼働中にファイルを書き換えても反映されない)。コードを更新したら以下でデプロイし直す:
+
+```bash
+git pull
+docker compose up -d --build tikuwa
+```
+
+- `data/`(SQLite DB)と`certs/`(証明書)はホスト側にvolumeとして永続化されるので、
+  イメージの再ビルド・コンテナの再作成をしてもデータは消えない。
+
+### 注意: 本番でwatchモードを使わない
+
+`tikuwa`サービスは`pnpm run start`(`tsx`をwatchなしで1回起動するだけ)で動く。
+`tsx watch`のような自動再起動をこのサービスに使うと、ファイル変更のたびにプロセスが再起動し、
+SQLiteのコネクションやカメラ絡みの状態が不安定になる可能性があるため、意図的に避けている。
+コードの反映は上記の`docker compose up -d --build`による明示的な再デプロイのみで行う。
+
+## API概要
+
+すべて `/api/products` 配下。
+
+| メソッド | パス | 内容 |
+|---|---|---|
+| GET | `/api/products?q=` | 一覧・検索 |
+| GET | `/api/products/replenishment` | 目標在庫数に対して不足している商品一覧 |
+| GET | `/api/products/barcode/:code` | バーコードで検索 |
+| GET | `/api/products/:id` | 詳細 |
+| POST | `/api/products` | 新規登録 |
+| PUT | `/api/products/:id` | 編集 |
+| DELETE | `/api/products/:id` | 削除 |
+| GET | `/api/products/:id/transactions` | 入出庫履歴 |
+| POST | `/api/products/:id/transactions` | 入出庫記録(`type: in\|out\|adjust`) |
