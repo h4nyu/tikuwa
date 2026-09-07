@@ -712,9 +712,14 @@ function init(): void {
 
   void loadProductList();
 
+  // Service Workerを登録しているとiOSでホーム画面追加(standalone)時に
+  // カメラ映像が真っ黒になる既知のWebKit不具合があるため、登録しない。
+  // 既にインストール済みの端末は既存の登録を解除して復旧させる。
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {
-      /* オフライン利用は必須ではないため失敗しても無視する */
+    navigator.serviceWorker.getRegistrations().then((regs) => {
+      for (const reg of regs) reg.unregister();
+    }).catch(() => {
+      /* ignore */
     });
   }
 }
