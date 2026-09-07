@@ -351,8 +351,9 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
     void (async () => {
       try {
         await Api.addBarcode(p.id, { barcode, quantity_per_scan: qty, label });
-        showToast('バーコードを追加しました');
-        renderProductDetail(await Api.byId(p.id), txs);
+        await Api.addTransaction(p.id, { type: 'in', quantity: qty, note: label || 'バーコード登録' });
+        showToast(`バーコードを追加し、${qty}を在庫に反映しました`);
+        renderProductDetail(await Api.byId(p.id), await Api.transactions(p.id));
       } catch (err) {
         showToast((err as Error).message);
       }
@@ -573,8 +574,9 @@ function openAttachBarcodeQuantityStep(code: string, product: ProductDto): void 
     void (async () => {
       try {
         await Api.addBarcode(product.id, { barcode: code, quantity_per_scan: qty, label });
+        await Api.addTransaction(product.id, { type: 'in', quantity: qty, note: label || 'バーコード登録' });
         closeModal();
-        showToast(`「${product.name}」にバーコードを追加しました`);
+        showToast(`「${product.name}」に${qty}を追加しました`);
         resumeScanning();
       } catch (err) {
         showToast((err as Error).message);
