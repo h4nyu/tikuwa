@@ -103,3 +103,12 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 | DELETE | `/api/products/:id` | 削除 |
 | GET | `/api/products/:id/transactions` | 入出庫履歴 |
 | POST | `/api/products/:id/transactions` | 入出庫記録(`type: in\|out\|adjust`) |
+| POST | `/api/products/:id/barcodes` | バーコードを追加(`quantity_per_scan`で箱・ケース等の数量を指定) |
+| DELETE | `/api/products/:id/barcodes/:barcodeId` | バーコードを削除 |
+
+## 複数バーコード(箱・ケース対応)
+
+1商品に複数のバーコードを登録でき、それぞれに「1回のスキャンで増減する数量」(`quantityPerScan`)を持たせられる。
+例: 刺繍糸1本のバーコードは`quantityPerScan=1`、12本入り箱のバーコードは`quantityPerScan=12`で登録すると、
+箱をスキャンした際に自動で+12が提案される。スキャンして未登録だった場合は「新規商品として登録」の他に
+「既存の商品に追加」を選べ、検索して商品を選ぶとその場でバーコードを紐付けられる。

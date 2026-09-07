@@ -1,10 +1,17 @@
 import { Html5Qrcode } from 'html5-qrcode';
 import './styles.css';
 
+interface ProductBarcodeDto {
+  id: number;
+  productId: number;
+  barcode: string;
+  quantityPerScan: number;
+  label: string | null;
+}
+
 interface ProductDto {
   id: number;
   name: string;
-  barcode: string | null;
   category: string | null;
   unit: string;
   currentStock: number;
@@ -12,6 +19,11 @@ interface ProductDto {
   memo: string | null;
   needed: number;
   lowStock: boolean;
+  barcodes: ProductBarcodeDto[];
+}
+
+interface BarcodeMatchDto extends ProductDto {
+  matchedBarcode: ProductBarcodeDto;
 }
 
 interface TransactionDto {
@@ -55,6 +67,11 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => map[c]);
 }
 
+function productMetaLine(p: ProductDto): string {
+  const barcodeNote = p.barcodes.length ? `バーコード${p.barcodes.length}件` : null;
+  return [p.category, barcodeNote].filter(Boolean).join(' ・ ') || '未分類';
+}
+
 let toastTimer: number | undefined;
 function showToast(message: string): void {
   const toast = qs<HTMLDivElement>('#toast');
@@ -86,7 +103,7 @@ const Api = {
   list: (q?: string) => api<ProductDto[]>(`/api/products${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   replenishment: () => api<ProductDto[]>('/api/products/replenishment'),
   byId: (id: number) => api<ProductDto>(`/api/products/${id}`),
-  byBarcode: (code: string) => api<ProductDto>(`/api/products/barcode/${encodeURIComponent(code)}`),
+  byBarcode: (code: string) => api<BarcodeMatchDto>(`/api/products/barcode/${encodeURIComponent(code)}`),
   create: (data: Record<string, unknown>) =>
     api<ProductDto>('/api/products', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: Record<string, unknown>) =>
@@ -95,6 +112,10 @@ const Api = {
   transactions: (id: number) => api<TransactionDto[]>(`/api/products/${id}/transactions`),
   addTransaction: (id: number, data: Record<string, unknown>) =>
     api<ProductDto>(`/api/products/${id}/transactions`, { method: 'POST', body: JSON.stringify(data) }),
+  addBarcode: (productId: number, data: Record<string, unknown>) =>
+    api<ProductBarcodeDto>(`/api/products/${productId}/barcodes`, { method: 'POST', body: JSON.stringify(data) }),
+  removeBarcode: (productId: number, barcodeId: number) =>
+    api<void>(`/api/products/${productId}/barcodes/${barcodeId}`, { method: 'DELETE' }),
 };
 
 // ---- View switching ------------------------------------------------------
@@ -125,7 +146,7 @@ function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): 
   const li = el('li', { class: `product-card${p.lowStock ? ' low-stock' : ''}`, 'data-id': String(p.id) });
   const info = el('div', { class: 'product-info' }, [
     el('div', { class: 'product-name' }, [p.name]),
-    el('div', { class: 'product-meta' }, [[p.category, p.barcode].filter(Boolean).join(' ・ ') || '未分類']),
+    el('div', { class: 'product-meta' }, [productMetaLine(p)]),
   ]);
   const stock = el('div', { class: 'product-stock' }, [
     el('div', { class: 'stock-num' }, [`${p.currentStock} ${p.unit}`]),
@@ -199,10 +220,25 @@ async function openProductDetail(id: number): Promise<void> {
   }
 }
 
+function barcodeListHtml(p: ProductDto): string {
+  if (!p.barcodes.length) {
+    return '<li style="color:var(--text-muted)">バーコード未登録</li>';
+  }
+  return p.barcodes
+    .map(
+      (b) => `
+    <li>
+      <span>${escapeHtml(b.barcode)}${b.label ? ' ・ ' + escapeHtml(b.label) : ''}</span>
+      <span>×${b.quantityPerScan} <button class="link-btn" data-remove-barcode="${b.id}">削除</button></span>
+    </li>`
+    )
+    .join('');
+}
+
 function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
   const modal = openModal(`
     <h2>${escapeHtml(p.name)}</h2>
-    <p class="product-meta">${escapeHtml([p.category, p.barcode].filter(Boolean).join(' ・ ') || '未分類')}</p>
+    <p class="product-meta">${escapeHtml(productMetaLine(p))}</p>
     <div class="detail-stock-row">
       <div><span class="big">${p.currentStock}</span><span class="small">現在庫(${escapeHtml(p.unit)})</span></div>
       <div><span class="big">${p.targetStock}</span><span class="small">目標在庫</span></div>
@@ -251,7 +287,25 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
       }
     </ul>
 
-    <div class="btn-row">
+    <div class="section-desc" style="margin-top:18px;">バーコード</div>
+    <ul class="tx-list" id="barcode-list">${barcodeListHtml(p)}</ul>
+    <div class="form-row-inline">
+      <div class="form-row">
+        <label for="new-barcode">コード</label>
+        <input id="new-barcode" type="text" inputmode="numeric" placeholder="例: 4901234567890" />
+      </div>
+      <div class="form-row" style="flex:0 0 80px;">
+        <label for="new-barcode-qty">数量</label>
+        <input id="new-barcode-qty" type="number" inputmode="numeric" min="1" value="1" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="new-barcode-label">ラベル(任意)</label>
+      <input id="new-barcode-label" type="text" placeholder="例: 12本入り箱" />
+    </div>
+    <button class="btn btn-secondary btn-block" id="add-barcode-btn">バーコードを追加</button>
+
+    <div class="btn-row" style="margin-top:18px;">
       <button class="btn btn-secondary" id="edit-btn">編集する</button>
       <button class="btn btn-danger" id="delete-btn">削除</button>
     </div>
@@ -289,6 +343,37 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
     })();
   });
 
+  qs<HTMLButtonElement>('#add-barcode-btn', modal).addEventListener('click', () => {
+    const barcode = qs<HTMLInputElement>('#new-barcode', modal).value.trim();
+    const qty = Number(qs<HTMLInputElement>('#new-barcode-qty', modal).value) || 1;
+    const label = qs<HTMLInputElement>('#new-barcode-label', modal).value.trim() || null;
+    if (!barcode) return showToast('バーコードを入力してください');
+    void (async () => {
+      try {
+        await Api.addBarcode(p.id, { barcode, quantity_per_scan: qty, label });
+        showToast('バーコードを追加しました');
+        renderProductDetail(await Api.byId(p.id), txs);
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
+
+  for (const btn of Array.from(modal.querySelectorAll<HTMLButtonElement>('[data-remove-barcode]'))) {
+    btn.addEventListener('click', () => {
+      const barcodeId = Number(btn.dataset.removeBarcode);
+      void (async () => {
+        try {
+          await Api.removeBarcode(p.id, barcodeId);
+          showToast('バーコードを削除しました');
+          renderProductDetail(await Api.byId(p.id), txs);
+        } catch (err) {
+          showToast((err as Error).message);
+        }
+      })();
+    });
+  }
+
   qs<HTMLButtonElement>('#edit-btn', modal).addEventListener('click', () => openProductForm(p));
 
   qs<HTMLButtonElement>('#delete-btn', modal).addEventListener('click', () => {
@@ -313,6 +398,32 @@ function refreshCurrentView(): void {
 
 // ---- Add / edit product form ------------------------------------------
 
+function addBarcodeRow(container: HTMLElement, barcode = '', qty = 1): void {
+  const row = el('div', { class: 'form-row-inline barcode-row' });
+  row.innerHTML = `
+    <div class="form-row"><label>バーコード</label><input class="br-code" type="text" inputmode="numeric" value="${escapeHtml(
+      barcode
+    )}" /></div>
+    <div class="form-row" style="flex:0 0 80px;"><label>数量</label><input class="br-qty" type="number" inputmode="numeric" min="1" value="${qty}" /></div>
+  `;
+  const removeBtn = el('button', { class: 'btn btn-secondary', type: 'button' }, ['×']);
+  removeBtn.style.flex = '0 0 auto';
+  removeBtn.style.alignSelf = 'flex-end';
+  removeBtn.style.marginBottom = '12px';
+  removeBtn.addEventListener('click', () => row.remove());
+  row.append(removeBtn);
+  container.append(row);
+}
+
+function collectBarcodeRows(container: HTMLElement): { barcode: string; quantity_per_scan: number }[] {
+  return Array.from(container.querySelectorAll<HTMLDivElement>('.barcode-row'))
+    .map((row) => ({
+      barcode: row.querySelector<HTMLInputElement>('.br-code')!.value.trim(),
+      quantity_per_scan: Number(row.querySelector<HTMLInputElement>('.br-qty')!.value) || 1,
+    }))
+    .filter((b) => b.barcode);
+}
+
 function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
   const isEdit = !!existing;
   const modal = openModal(`
@@ -320,12 +431,6 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
     <div class="form-row">
       <label for="f-name">商品名 *</label>
       <input id="f-name" type="text" value="${escapeHtml(existing?.name || '')}" />
-    </div>
-    <div class="form-row">
-      <label for="f-barcode">バーコード</label>
-      <input id="f-barcode" type="text" inputmode="numeric" value="${escapeHtml(
-        existing?.barcode || prefillBarcode || ''
-      )}" />
     </div>
     <div class="form-row-inline">
       <div class="form-row">
@@ -355,15 +460,29 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
       <label for="f-memo">メモ</label>
       <input id="f-memo" type="text" value="${escapeHtml(existing?.memo || '')}" />
     </div>
+    ${
+      isEdit
+        ? '<p class="section-desc">バーコードの追加・削除は詳細画面から行えます。</p>'
+        : `<div class="form-row">
+            <label>バーコード(任意・複数可)</label>
+            <div id="barcode-rows"></div>
+            <button type="button" class="btn btn-secondary" id="add-barcode-row">+ バーコードを追加</button>
+          </div>`
+    }
     <button class="btn btn-primary btn-block" id="f-submit">${isEdit ? '更新する' : '登録する'}</button>
   `);
+
+  if (!isEdit) {
+    const rows = qs<HTMLDivElement>('#barcode-rows', modal);
+    addBarcodeRow(rows, prefillBarcode || '', 1);
+    qs<HTMLButtonElement>('#add-barcode-row', modal).addEventListener('click', () => addBarcodeRow(rows));
+  }
 
   qs<HTMLButtonElement>('#f-submit', modal).addEventListener('click', () => {
     const name = qs<HTMLInputElement>('#f-name', modal).value.trim();
     if (!name) return showToast('商品名を入力してください');
     const payload: Record<string, unknown> = {
       name,
-      barcode: qs<HTMLInputElement>('#f-barcode', modal).value.trim() || null,
       category: qs<HTMLInputElement>('#f-category', modal).value.trim() || null,
       unit: qs<HTMLInputElement>('#f-unit', modal).value.trim() || '個',
       target_stock: Number(qs<HTMLInputElement>('#f-target', modal).value) || 0,
@@ -371,6 +490,7 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
     };
     if (!isEdit) {
       payload.current_stock = Number(qs<HTMLInputElement>('#f-current', modal).value) || 0;
+      payload.barcodes = collectBarcodeRows(qs<HTMLDivElement>('#barcode-rows', modal));
     }
     void (async () => {
       try {
@@ -379,6 +499,83 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
         closeModal();
         showToast(isEdit ? '更新しました' : '登録しました');
         refreshCurrentView();
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
+}
+
+// ---- Attach an existing barcode to an already-registered product ----------
+
+function openAttachBarcodeFlow(code: string): void {
+  const modal = openModal(`
+    <h2>既存の商品にバーコードを追加</h2>
+    <p class="product-meta">バーコード: ${escapeHtml(code)}</p>
+    <div class="form-row">
+      <label for="attach-search">商品を検索</label>
+      <input id="attach-search" type="search" placeholder="商品名で検索" autocomplete="off" />
+    </div>
+    <ul id="attach-product-list" class="product-list"></ul>
+  `);
+
+  const listEl = qs<HTMLUListElement>('#attach-product-list', modal);
+
+  async function search(q: string): Promise<void> {
+    try {
+      const products = await Api.list(q);
+      listEl.innerHTML = '';
+      for (const p of products) {
+        const li = el('li', { class: 'product-card' }, [
+          el('div', { class: 'product-info' }, [
+            el('div', { class: 'product-name' }, [p.name]),
+            el('div', { class: 'product-meta' }, [`現在庫 ${p.currentStock}${p.unit}`]),
+          ]),
+        ]);
+        li.addEventListener('click', () => openAttachBarcodeQuantityStep(code, p));
+        listEl.append(li);
+      }
+    } catch (err) {
+      showToast((err as Error).message);
+    }
+  }
+
+  let timer: number | undefined;
+  qs<HTMLInputElement>('#attach-search', modal).addEventListener('input', (e) => {
+    window.clearTimeout(timer);
+    const value = (e.target as HTMLInputElement).value.trim();
+    timer = window.setTimeout(() => void search(value), 200);
+  });
+
+  void search('');
+}
+
+function openAttachBarcodeQuantityStep(code: string, product: ProductDto): void {
+  const modal = openModal(`
+    <h2>${escapeHtml(product.name)} にバーコードを追加</h2>
+    <p class="product-meta">バーコード: ${escapeHtml(code)}</p>
+    <div class="form-row-inline">
+      <div class="form-row">
+        <label for="attach-qty">1回のスキャンで増える数量</label>
+        <input id="attach-qty" type="number" inputmode="numeric" min="1" value="1" />
+      </div>
+    </div>
+    <div class="form-row">
+      <label for="attach-label">ラベル(任意)</label>
+      <input id="attach-label" type="text" placeholder="例: 12本入り箱" />
+    </div>
+    <button class="btn btn-primary btn-block" id="attach-submit">このバーコードを追加する</button>
+  `);
+
+  qs<HTMLButtonElement>('#attach-submit', modal).addEventListener('click', () => {
+    const qty = Number(qs<HTMLInputElement>('#attach-qty', modal).value) || 1;
+    const label = qs<HTMLInputElement>('#attach-label', modal).value.trim() || null;
+    void (async () => {
+      try {
+        await Api.addBarcode(product.id, { barcode: code, quantity_per_scan: qty, label });
+        closeModal();
+        showToast(`「${product.name}」にバーコードを追加しました`);
+        resumeScanning();
       } catch (err) {
         showToast((err as Error).message);
       }
@@ -434,43 +631,53 @@ async function onScanSuccess(code: string): Promise<void> {
   resultPanel.hidden = false;
 
   try {
-    const product = await Api.byBarcode(code);
+    const match = await Api.byBarcode(code);
+    const qty = match.matchedBarcode.quantityPerScan;
+    const qtyNote = match.matchedBarcode.label ? `${match.matchedBarcode.label} ・ ×${qty}` : `×${qty}`;
     resultPanel.innerHTML = `
-      <h3>${escapeHtml(product.name)}</h3>
-      <p class="product-meta">現在庫: ${product.currentStock}${escapeHtml(product.unit)}(目標 ${
-      product.targetStock
+      <h3>${escapeHtml(match.name)}</h3>
+      <p class="product-meta">${escapeHtml(qtyNote)} ・ 現在庫: ${match.currentStock}${escapeHtml(match.unit)}(目標 ${
+      match.targetStock
     })</p>
       <div class="btn-row">
-        <button class="btn btn-primary" id="scan-in">+1 入庫</button>
-        <button class="btn btn-secondary" id="scan-out">−1 出庫</button>
+        <button class="btn btn-primary" id="scan-in">+${qty} 入庫</button>
+        <button class="btn btn-secondary" id="scan-out">−${qty} 出庫</button>
       </div>
       <button class="link-btn" id="scan-detail">詳細・数量指定を開く</button>
       <button class="link-btn" id="scan-resume">スキャンを再開する</button>
     `;
-    qs<HTMLButtonElement>('#scan-in', resultPanel).addEventListener('click', () => void quickScanTx(product.id, 'in'));
+    qs<HTMLButtonElement>('#scan-in', resultPanel).addEventListener('click', () =>
+      void quickScanTx(match.id, 'in', qty)
+    );
     qs<HTMLButtonElement>('#scan-out', resultPanel).addEventListener('click', () =>
-      void quickScanTx(product.id, 'out')
+      void quickScanTx(match.id, 'out', qty)
     );
     qs<HTMLButtonElement>('#scan-detail', resultPanel).addEventListener('click', () =>
-      void openProductDetail(product.id)
+      void openProductDetail(match.id)
     );
     qs<HTMLButtonElement>('#scan-resume', resultPanel).addEventListener('click', () => resumeScanning());
   } catch {
     resultPanel.innerHTML = `
       <p class="not-found">未登録のバーコードです: ${escapeHtml(code)}</p>
-      <button class="btn btn-primary btn-block" id="scan-register">この商品を登録する</button>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="scan-register">新規商品として登録</button>
+        <button class="btn btn-secondary" id="scan-attach">既存の商品に追加</button>
+      </div>
       <button class="link-btn" id="scan-resume">スキャンを再開する</button>
     `;
     qs<HTMLButtonElement>('#scan-register', resultPanel).addEventListener('click', () =>
       openProductForm(undefined, code)
     );
+    qs<HTMLButtonElement>('#scan-attach', resultPanel).addEventListener('click', () =>
+      openAttachBarcodeFlow(code)
+    );
     qs<HTMLButtonElement>('#scan-resume', resultPanel).addEventListener('click', () => resumeScanning());
   }
 }
 
-async function quickScanTx(productId: number, type: 'in' | 'out'): Promise<void> {
+async function quickScanTx(productId: number, type: 'in' | 'out', qty: number): Promise<void> {
   try {
-    const updated = await Api.addTransaction(productId, { type, quantity: 1 });
+    const updated = await Api.addTransaction(productId, { type, quantity: qty });
     showToast(`${txLabel(type)}: 現在 ${updated.currentStock}${updated.unit}`);
     resumeScanning();
   } catch (err) {

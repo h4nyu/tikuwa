@@ -6,6 +6,7 @@ import {
   isLowStock,
   neededQuantity,
   type Product,
+  type ProductBarcode,
   type ProductRepository,
   type ProductWithStatus,
   type TransactionType,
@@ -35,6 +36,23 @@ async function readJson(req: Request): Promise<Record<string, unknown>> {
   }
 }
 
+interface RawBarcodeInput {
+  barcode?: unknown;
+  quantity_per_scan?: unknown;
+  label?: unknown;
+}
+
+function parseBarcodeInputs(value: unknown): { barcode: string; quantityPerScan?: number; label?: string | null }[] {
+  if (!Array.isArray(value)) return [];
+  return (value as RawBarcodeInput[])
+    .filter((b) => typeof b.barcode === 'string' && b.barcode.trim())
+    .map((b) => ({
+      barcode: String(b.barcode),
+      quantityPerScan: b.quantity_per_scan !== undefined ? Number(b.quantity_per_scan) : undefined,
+      label: b.label !== undefined ? (b.label as string | null) : undefined,
+    }));
+}
+
 export function productsRoutes(repo: ProductRepository): Hono {
   const app = new Hono();
 
@@ -52,7 +70,10 @@ export function productsRoutes(repo: ProductRepository): Hono {
     if (result instanceof NotFoundError) {
       return c.json({ error: result.kind, message: result.message }, statusFor(result));
     }
-    return c.json(serialize(result));
+    return c.json({
+      ...serialize(result.product),
+      matchedBarcode: result.matchedBarcode,
+    });
   });
 
   app.get('/:id', (c) => {
@@ -67,12 +88,12 @@ export function productsRoutes(repo: ProductRepository): Hono {
     const body = await readJson(c.req.raw);
     const result = repo.create({
       name: String(body.name ?? ''),
-      barcode: (body.barcode as string | null) ?? null,
       category: (body.category as string | null) ?? null,
       unit: body.unit as string | undefined,
       targetStock: body.target_stock as number | undefined,
       currentStock: body.current_stock as number | undefined,
       memo: (body.memo as string | null) ?? null,
+      barcodes: parseBarcodeInputs(body.barcodes),
     });
     if (result instanceof Error) {
       const err = result as ErrorResult;
@@ -85,7 +106,6 @@ export function productsRoutes(repo: ProductRepository): Hono {
     const body = await readJson(c.req.raw);
     const result = repo.update(Number(c.req.param('id')), {
       name: body.name as string | undefined,
-      barcode: body.barcode as string | null | undefined,
       category: body.category as string | null | undefined,
       unit: body.unit as string | undefined,
       targetStock: body.target_stock as number | undefined,
@@ -127,6 +147,28 @@ export function productsRoutes(repo: ProductRepository): Hono {
       return c.json({ error: err.kind, message: err.message }, statusFor(err));
     }
     return c.json(serialize(result));
+  });
+
+  app.post('/:id/barcodes', async (c) => {
+    const body = await readJson(c.req.raw);
+    const result = repo.addBarcode(Number(c.req.param('id')), {
+      barcode: String(body.barcode ?? ''),
+      quantityPerScan: body.quantity_per_scan !== undefined ? Number(body.quantity_per_scan) : undefined,
+      label: (body.label as string | null) ?? null,
+    });
+    if (result instanceof Error) {
+      const err = result as ErrorResult;
+      return c.json({ error: err.kind, message: err.message }, statusFor(err));
+    }
+    return c.json(result satisfies ProductBarcode, 201);
+  });
+
+  app.delete('/:id/barcodes/:barcodeId', (c) => {
+    const result = repo.removeBarcode(Number(c.req.param('barcodeId')));
+    if (result instanceof NotFoundError) {
+      return c.json({ error: result.kind, message: result.message }, statusFor(result));
+    }
+    return c.body(null, 204);
   });
 
   return app;

@@ -1,6 +1,9 @@
 import type {
+  BarcodeMatch,
+  NewBarcodeInput,
   NewProductInput,
   Product,
+  ProductBarcode,
   StockChangeInput,
   StockTransaction,
   UpdateProductInput,
@@ -11,7 +14,7 @@ import type { DuplicateBarcodeError, NotFoundError, Result, ValidationError } fr
 export interface ProductRepository {
   findAll(query?: string): Product[];
   findById(id: number): Result<Product, NotFoundError>;
-  findByBarcode(barcode: string): Result<Product, NotFoundError>;
+  findByBarcode(barcode: string): Result<BarcodeMatch, NotFoundError>;
   findReplenishmentNeeded(): Product[];
   create(input: NewProductInput): Result<Product, ValidationError | DuplicateBarcodeError>;
   update(id: number, input: UpdateProductInput): Result<Product, NotFoundError | DuplicateBarcodeError>;
@@ -21,4 +24,10 @@ export interface ProductRepository {
     productId: number,
     input: StockChangeInput
   ): Result<Product, NotFoundError | ValidationError>;
+
+  addBarcode(
+    productId: number,
+    input: NewBarcodeInput
+  ): Result<ProductBarcode, NotFoundError | ValidationError | DuplicateBarcodeError>;
+  removeBarcode(barcodeId: number): Result<true, NotFoundError>;
 }

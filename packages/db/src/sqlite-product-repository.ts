@@ -4,8 +4,11 @@ import {
   DuplicateBarcodeError,
   NotFoundError,
   ValidationError,
+  type BarcodeMatch,
+  type NewBarcodeInput,
   type NewProductInput,
   type Product,
+  type ProductBarcode,
   type ProductRepository,
   type Result,
   type StockChangeInput,
@@ -16,7 +19,6 @@ import {
 interface ProductRow {
   id: number;
   name: string;
-  barcode: string | null;
   category: string | null;
   unit: string;
   current_stock: number;
@@ -24,6 +26,15 @@ interface ProductRow {
   memo: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface ProductBarcodeRow {
+  id: number;
+  product_id: number;
+  barcode: string;
+  quantity_per_scan: number;
+  label: string | null;
+  created_at: string;
 }
 
 interface StockTransactionRow {
@@ -36,11 +47,10 @@ interface StockTransactionRow {
   created_at: string;
 }
 
-function toProduct(row: ProductRow): Product {
+function toProduct(row: ProductRow, barcodes: ProductBarcodeRow[]): Product {
   return {
     id: row.id,
     name: row.name,
-    barcode: row.barcode,
     category: row.category,
     unit: row.unit,
     currentStock: row.current_stock,
@@ -48,6 +58,18 @@ function toProduct(row: ProductRow): Product {
     memo: row.memo,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    barcodes: barcodes.map(toBarcode),
+  };
+}
+
+function toBarcode(row: ProductBarcodeRow): ProductBarcode {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    barcode: row.barcode,
+    quantityPerScan: row.quantity_per_scan,
+    label: row.label,
+    createdAt: row.created_at,
   };
 }
 
@@ -89,47 +111,83 @@ function runInTransaction<T>(db: DatabaseSync, fn: () => T): T {
   }
 }
 
+function normalizeQuantityPerScan(value: number | undefined): number {
+  return Number.isFinite(value) && value! > 0 ? Math.trunc(value!) : 1;
+}
+
 export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
+  const getBarcodesForProduct = (productId: number): ProductBarcodeRow[] =>
+    asRow<ProductBarcodeRow[]>(
+      db.prepare('SELECT * FROM product_barcodes WHERE product_id = ? ORDER BY id').all(productId)
+    );
+
+  const allBarcodesGrouped = (): Map<number, ProductBarcodeRow[]> => {
+    const rows = asRow<ProductBarcodeRow[]>(
+      db.prepare('SELECT * FROM product_barcodes ORDER BY product_id, id').all()
+    );
+    const map = new Map<number, ProductBarcodeRow[]>();
+    for (const row of rows) {
+      const list = map.get(row.product_id) ?? [];
+      list.push(row);
+      map.set(row.product_id, list);
+    }
+    return map;
+  };
+
   const findAll: ProductRepository['findAll'] = (query) => {
     const q = (query ?? '').trim();
+    let rows: ProductRow[];
     if (!q) {
-      return asRow<ProductRow[]>(db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all()).map(
-        toProduct
+      rows = asRow<ProductRow[]>(db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all());
+    } else {
+      const like = `%${q}%`;
+      rows = asRow<ProductRow[]>(
+        db
+          .prepare(
+            `SELECT DISTINCT p.* FROM products p
+             LEFT JOIN product_barcodes b ON b.product_id = p.id
+             WHERE p.name LIKE ? OR p.category LIKE ? OR b.barcode LIKE ?
+             ORDER BY p.name COLLATE NOCASE`
+          )
+          .all(like, like, like)
       );
     }
-    const like = `%${q}%`;
-    return asRow<ProductRow[]>(
-      db
-        .prepare(
-          `SELECT * FROM products
-           WHERE name LIKE ? OR category LIKE ? OR barcode LIKE ?
-           ORDER BY name COLLATE NOCASE`
-        )
-        .all(like, like, like)
-    ).map(toProduct);
+    const grouped = allBarcodesGrouped();
+    return rows.map((r) => toProduct(r, grouped.get(r.id) ?? []));
   };
 
   const findById: ProductRepository['findById'] = (id) => {
     const row = asRow<ProductRow | undefined>(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
-    return row ? toProduct(row) : new NotFoundError();
+    return row ? toProduct(row, getBarcodesForProduct(id)) : new NotFoundError();
   };
 
   const findByBarcode: ProductRepository['findByBarcode'] = (barcode) => {
-    const row = asRow<ProductRow | undefined>(
-      db.prepare('SELECT * FROM products WHERE barcode = ?').get(barcode)
+    const bcRow = asRow<ProductBarcodeRow | undefined>(
+      db.prepare('SELECT * FROM product_barcodes WHERE barcode = ?').get(barcode)
     );
-    return row ? toProduct(row) : new NotFoundError();
+    if (!bcRow) return new NotFoundError();
+    const productRow = asRow<ProductRow | undefined>(
+      db.prepare('SELECT * FROM products WHERE id = ?').get(bcRow.product_id)
+    );
+    if (!productRow) return new NotFoundError();
+    const match: BarcodeMatch = {
+      product: toProduct(productRow, getBarcodesForProduct(bcRow.product_id)),
+      matchedBarcode: toBarcode(bcRow),
+    };
+    return match;
   };
 
   const findReplenishmentNeeded: ProductRepository['findReplenishmentNeeded'] = () => {
-    return asRow<ProductRow[]>(
+    const rows = asRow<ProductRow[]>(
       db
         .prepare(
           `SELECT * FROM products WHERE current_stock < target_stock
            ORDER BY (target_stock - current_stock) DESC`
         )
         .all()
-    ).map(toProduct);
+    );
+    const grouped = allBarcodesGrouped();
+    return rows.map((r) => toProduct(r, grouped.get(r.id) ?? []));
   };
 
   const create: ProductRepository['create'] = (input: NewProductInput) => {
@@ -142,22 +200,34 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
       : 0;
 
     try {
-      const info = db
-        .prepare(
-          `INSERT INTO products (name, barcode, category, unit, target_stock, current_stock, memo)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`
-        )
-        .run(
-          name,
-          input.barcode?.trim() || null,
-          input.category?.trim() || null,
-          input.unit?.trim() || '個',
-          targetStock,
-          currentStock,
-          input.memo?.trim() || null
-        );
-      const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid));
-      return toProduct(row);
+      return runInTransaction<Product>(db, () => {
+        const info = db
+          .prepare(
+            `INSERT INTO products (name, category, unit, target_stock, current_stock, memo)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            name,
+            input.category?.trim() || null,
+            input.unit?.trim() || '個',
+            targetStock,
+            currentStock,
+            input.memo?.trim() || null
+          );
+        const productId = Number(info.lastInsertRowid);
+
+        for (const bc of input.barcodes ?? []) {
+          const barcode = bc.barcode.trim();
+          if (!barcode) continue;
+          db.prepare(
+            `INSERT INTO product_barcodes (product_id, barcode, quantity_per_scan, label)
+             VALUES (?, ?, ?, ?)`
+          ).run(productId, barcode, normalizeQuantityPerScan(bc.quantityPerScan), bc.label?.trim() || null);
+        }
+
+        const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(productId));
+        return toProduct(row, getBarcodesForProduct(productId));
+      });
     } catch (err) {
       if (isUniqueViolation(err)) return new DuplicateBarcodeError();
       throw err;
@@ -171,7 +241,6 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
     if (!existingRow) return new NotFoundError();
 
     const name = input.name !== undefined && input.name.trim() ? input.name.trim() : existingRow.name;
-    const barcode = input.barcode !== undefined ? input.barcode?.trim() || null : existingRow.barcode;
     const category = input.category !== undefined ? input.category?.trim() || null : existingRow.category;
     const unit = input.unit !== undefined && input.unit.trim() ? input.unit.trim() : existingRow.unit;
     const targetStock =
@@ -180,19 +249,14 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
         : existingRow.target_stock;
     const memo = input.memo !== undefined ? input.memo?.trim() || null : existingRow.memo;
 
-    try {
-      db.prepare(
-        `UPDATE products SET
-          name = ?, barcode = ?, category = ?, unit = ?, target_stock = ?, memo = ?,
-          updated_at = datetime('now','localtime')
-         WHERE id = ?`
-      ).run(name, barcode, category, unit, targetStock, memo, id);
-      const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
-      return toProduct(row);
-    } catch (err) {
-      if (isUniqueViolation(err)) return new DuplicateBarcodeError();
-      throw err;
-    }
+    db.prepare(
+      `UPDATE products SET
+        name = ?, category = ?, unit = ?, target_stock = ?, memo = ?,
+        updated_at = datetime('now','localtime')
+       WHERE id = ?`
+    ).run(name, category, unit, targetStock, memo, id);
+    const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
+    return toProduct(row, getBarcodesForProduct(id));
   };
 
   const remove: ProductRepository['remove'] = (id) => {
@@ -236,8 +300,40 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
       ).run(productId, input.type, actualDelta, resultingStock, input.note?.trim() || null);
 
       const updated = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(productId));
-      return toProduct(updated);
+      return toProduct(updated, getBarcodesForProduct(productId));
     });
+  };
+
+  const addBarcode: ProductRepository['addBarcode'] = (productId, input: NewBarcodeInput) => {
+    const barcode = input.barcode.trim();
+    if (!barcode) return new ValidationError('バーコードを入力してください');
+
+    const product = asRow<ProductRow | undefined>(
+      db.prepare('SELECT * FROM products WHERE id = ?').get(productId)
+    );
+    if (!product) return new NotFoundError();
+
+    try {
+      const info = db
+        .prepare(
+          `INSERT INTO product_barcodes (product_id, barcode, quantity_per_scan, label)
+           VALUES (?, ?, ?, ?)`
+        )
+        .run(productId, barcode, normalizeQuantityPerScan(input.quantityPerScan), input.label?.trim() || null);
+      const row = asRow<ProductBarcodeRow>(
+        db.prepare('SELECT * FROM product_barcodes WHERE id = ?').get(info.lastInsertRowid)
+      );
+      return toBarcode(row);
+    } catch (err) {
+      if (isUniqueViolation(err)) return new DuplicateBarcodeError();
+      throw err;
+    }
+  };
+
+  const removeBarcode: ProductRepository['removeBarcode'] = (barcodeId) => {
+    const info = db.prepare('DELETE FROM product_barcodes WHERE id = ?').run(barcodeId);
+    if (info.changes === 0) return new NotFoundError();
+    return true;
   };
 
   return {
@@ -250,5 +346,7 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
     remove,
     listTransactions,
     recordTransaction,
+    addBarcode,
+    removeBarcode,
   };
 }
