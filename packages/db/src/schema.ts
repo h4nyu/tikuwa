@@ -1,10 +1,10 @@
-import type Database from 'better-sqlite3';
+import type { DatabaseSync } from 'node:sqlite';
 
-export function migrate(db: Database.Database): void {
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-
+export function migrate(db: DatabaseSync): void {
   db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA foreign_keys = ON;
+
     CREATE TABLE IF NOT EXISTS products (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,

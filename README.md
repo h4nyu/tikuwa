@@ -10,13 +10,15 @@ npm workspacesならぬ pnpm workspaces によるモノレポ。ports & adapters
 ```
 packages/
   core/    ドメイン型・純粋ロジック(Product, StockTransaction, 在庫計算)。フレームワーク非依存。
-  db/      ProductRepositoryのSQLite実装(better-sqlite3)。
+  db/      ProductRepositoryのSQLite実装(node:sqlite)。
   server/  Hono合成ルート(env読み込み・DI・HTTPS/HTTPサーバー起動)。
   web/     スマホ向けPWAフロントエンド(Vite + TypeScript + html5-qrcode)。
 ```
 
 - サーバー: [Hono](https://hono.dev/) + `@hono/node-server`
-- DB: SQLite(`better-sqlite3`)、`data/tikuwa.db` に保存
+- DB: SQLite(Node組み込みの`node:sqlite`)、`data/tikuwa.db` に保存。
+  ネイティブアドオンのビルドが不要なため、非力なRaspberry Piでもdocker buildが速い
+  (以前`better-sqlite3`を使っていたときはPi 3でビルドに10分近くかかっていた)。
 - フロント: Vite + TypeScript(バンドルなしの素のDOM操作、フレームワーク無し)
 - 型チェック: `core`/`db`/`server` はルートの単一`tsconfig.json`で1プログラムとして検査(ビルドはせず`tsx`で直接実行)。`web`はDOM/ESM前提のため別`tsconfig.json`でVite側がビルドする。
 

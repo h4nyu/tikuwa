@@ -1,4 +1,4 @@
-import type Database from 'better-sqlite3';
+import type { DatabaseSync } from 'node:sqlite';
 import {
   computeDelta,
   DuplicateBarcodeError,
@@ -67,46 +67,68 @@ function isUniqueViolation(err: unknown): boolean {
   return err instanceof Error && err.message.includes('UNIQUE');
 }
 
-export function SqliteProductRepository(db: Database.Database): ProductRepository {
+// node:sqliteの.get()/.all()はRecord<string, SQLOutputValue>を返すため、
+// 一度unknownを経由してテーブル固有の行型にキャストする。
+function asRow<T>(value: unknown): T {
+  return value as T;
+}
+
+/**
+ * node:sqliteのDatabaseSyncにはbetter-sqlite3のdb.transaction()相当のヘルパーが無いため、
+ * BEGIN/COMMIT/ROLLBACKを手動で発行する薄いラッパー。
+ */
+function runInTransaction<T>(db: DatabaseSync, fn: () => T): T {
+  db.exec('BEGIN');
+  try {
+    const result = fn();
+    db.exec('COMMIT');
+    return result;
+  } catch (err) {
+    db.exec('ROLLBACK');
+    throw err;
+  }
+}
+
+export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
   const findAll: ProductRepository['findAll'] = (query) => {
     const q = (query ?? '').trim();
     if (!q) {
-      return (db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all() as ProductRow[]).map(
+      return asRow<ProductRow[]>(db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all()).map(
         toProduct
       );
     }
     const like = `%${q}%`;
-    return (
+    return asRow<ProductRow[]>(
       db
         .prepare(
           `SELECT * FROM products
            WHERE name LIKE ? OR category LIKE ? OR barcode LIKE ?
            ORDER BY name COLLATE NOCASE`
         )
-        .all(like, like, like) as ProductRow[]
+        .all(like, like, like)
     ).map(toProduct);
   };
 
   const findById: ProductRepository['findById'] = (id) => {
-    const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as ProductRow | undefined;
+    const row = asRow<ProductRow | undefined>(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
     return row ? toProduct(row) : new NotFoundError();
   };
 
   const findByBarcode: ProductRepository['findByBarcode'] = (barcode) => {
-    const row = db.prepare('SELECT * FROM products WHERE barcode = ?').get(barcode) as
-      | ProductRow
-      | undefined;
+    const row = asRow<ProductRow | undefined>(
+      db.prepare('SELECT * FROM products WHERE barcode = ?').get(barcode)
+    );
     return row ? toProduct(row) : new NotFoundError();
   };
 
   const findReplenishmentNeeded: ProductRepository['findReplenishmentNeeded'] = () => {
-    return (
+    return asRow<ProductRow[]>(
       db
         .prepare(
           `SELECT * FROM products WHERE current_stock < target_stock
            ORDER BY (target_stock - current_stock) DESC`
         )
-        .all() as ProductRow[]
+        .all()
     ).map(toProduct);
   };
 
@@ -134,7 +156,7 @@ export function SqliteProductRepository(db: Database.Database): ProductRepositor
           currentStock,
           input.memo?.trim() || null
         );
-      const row = db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid) as ProductRow;
+      const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(info.lastInsertRowid));
       return toProduct(row);
     } catch (err) {
       if (isUniqueViolation(err)) return new DuplicateBarcodeError();
@@ -143,9 +165,9 @@ export function SqliteProductRepository(db: Database.Database): ProductRepositor
   };
 
   const update: ProductRepository['update'] = (id, input: UpdateProductInput) => {
-    const existingRow = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as
-      | ProductRow
-      | undefined;
+    const existingRow = asRow<ProductRow | undefined>(
+      db.prepare('SELECT * FROM products WHERE id = ?').get(id)
+    );
     if (!existingRow) return new NotFoundError();
 
     const name = input.name !== undefined && input.name.trim() ? input.name.trim() : existingRow.name;
@@ -165,7 +187,7 @@ export function SqliteProductRepository(db: Database.Database): ProductRepositor
           updated_at = datetime('now','localtime')
          WHERE id = ?`
       ).run(name, barcode, category, unit, targetStock, memo, id);
-      const row = db.prepare('SELECT * FROM products WHERE id = ?').get(id) as ProductRow;
+      const row = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(id));
       return toProduct(row);
     } catch (err) {
       if (isUniqueViolation(err)) return new DuplicateBarcodeError();
@@ -180,48 +202,42 @@ export function SqliteProductRepository(db: Database.Database): ProductRepositor
   };
 
   const listTransactions: ProductRepository['listTransactions'] = (productId) => {
-    return (
+    return asRow<StockTransactionRow[]>(
       db
         .prepare(
           `SELECT * FROM stock_transactions WHERE product_id = ? ORDER BY created_at DESC, id DESC LIMIT 200`
         )
-        .all(productId) as StockTransactionRow[]
+        .all(productId)
     ).map(toTransaction);
   };
 
-  const applyTransaction = db.transaction((productId: number, input: StockChangeInput): Result<
-    Product,
-    NotFoundError | ValidationError
-  > => {
-    const row = db.prepare('SELECT * FROM products WHERE id = ?').get(productId) as
-      | ProductRow
-      | undefined;
-    if (!row) return new NotFoundError();
-
-    const quantity = Math.trunc(input.quantity);
-    if (!Number.isFinite(quantity) || quantity < 0) {
-      return new ValidationError('数量は0以上の整数で指定してください');
-    }
-
-    const delta = computeDelta(input.type, quantity, row.current_stock);
-    const resultingStock = Math.max(0, row.current_stock + delta);
-    const actualDelta = resultingStock - row.current_stock;
-
-    db.prepare(`UPDATE products SET current_stock = ?, updated_at = datetime('now','localtime') WHERE id = ?`).run(
-      resultingStock,
-      productId
-    );
-    db.prepare(
-      `INSERT INTO stock_transactions (product_id, type, delta, resulting_stock, note)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(productId, input.type, actualDelta, resultingStock, input.note?.trim() || null);
-
-    const updated = db.prepare('SELECT * FROM products WHERE id = ?').get(productId) as ProductRow;
-    return toProduct(updated);
-  });
-
   const recordTransaction: ProductRepository['recordTransaction'] = (productId, input) => {
-    return applyTransaction(productId, input);
+    return runInTransaction<Result<Product, NotFoundError | ValidationError>>(db, () => {
+      const row = asRow<ProductRow | undefined>(
+        db.prepare('SELECT * FROM products WHERE id = ?').get(productId)
+      );
+      if (!row) return new NotFoundError();
+
+      const quantity = Math.trunc(input.quantity);
+      if (!Number.isFinite(quantity) || quantity < 0) {
+        return new ValidationError('数量は0以上の整数で指定してください');
+      }
+
+      const delta = computeDelta(input.type, quantity, row.current_stock);
+      const resultingStock = Math.max(0, row.current_stock + delta);
+      const actualDelta = resultingStock - row.current_stock;
+
+      db.prepare(
+        `UPDATE products SET current_stock = ?, updated_at = datetime('now','localtime') WHERE id = ?`
+      ).run(resultingStock, productId);
+      db.prepare(
+        `INSERT INTO stock_transactions (product_id, type, delta, resulting_stock, note)
+         VALUES (?, ?, ?, ?, ?)`
+      ).run(productId, input.type, actualDelta, resultingStock, input.note?.trim() || null);
+
+      const updated = asRow<ProductRow>(db.prepare('SELECT * FROM products WHERE id = ?').get(productId));
+      return toProduct(updated);
+    });
   };
 
   return {

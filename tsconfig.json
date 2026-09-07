@@ -7,6 +7,7 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "resolveJsonModule": true
   },
   "include": ["packages/core/src", "packages/db/src", "packages/server/src", "packages/server/scripts"]

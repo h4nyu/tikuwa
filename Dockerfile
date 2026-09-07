@@ -1,10 +1,6 @@
 FROM node:22-bookworm-slim
 
-# better-sqlite3のネイティブビルドに必要
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
-
+# DBはnode:sqlite(Node組み込み)を使うためネイティブビルドツールチェーンは不要。
 RUN npm install -g pnpm@12.3.4
 
 WORKDIR /app
