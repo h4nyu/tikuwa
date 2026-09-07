@@ -397,10 +397,12 @@ async function startScanner(): Promise<void> {
   qs<HTMLParagraphElement>('#scan-hint').hidden = false;
 
   try {
-    scanner = new Html5Qrcode('scan-reader');
+    // Android Chrome等のネイティブBarcodeDetectorはOS/端末依存で無反応になることがあるため、
+    // 実績のあるZXingベースのJSデコーダーに固定する。
+    scanner = new Html5Qrcode('scan-reader', { useBarCodeDetectorIfSupported: false, verbose: false });
     await scanner.start(
       { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 260, height: 160 } },
+      { fps: 10, qrbox: { width: 280, height: 180 } },
       (decodedText) => void onScanSuccess(decodedText),
       undefined
     );
