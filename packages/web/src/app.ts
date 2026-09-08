@@ -312,19 +312,20 @@ function exportReplenishmentCsv(): void {
 function openModal(contentHtml: string): HTMLDivElement {
   const backdrop = qs<HTMLDivElement>('#modal-backdrop');
   const modal = qs<HTMLDivElement>('#modal');
-  modal.innerHTML = contentHtml;
+  qs<HTMLDivElement>('#modal-content').innerHTML = contentHtml;
   backdrop.hidden = false;
   return modal;
 }
 
 function closeModal(): void {
   qs<HTMLDivElement>('#modal-backdrop').hidden = true;
-  qs<HTMLDivElement>('#modal').innerHTML = '';
+  qs<HTMLDivElement>('#modal-content').innerHTML = '';
 }
 
 qs<HTMLDivElement>('#modal-backdrop').addEventListener('click', (e) => {
   if (e.target === e.currentTarget) closeModal();
 });
+qs<HTMLButtonElement>('#modal-close-btn').addEventListener('click', () => closeModal());
 
 // ---- Product detail / quick stock actions ---------------------------------
 
