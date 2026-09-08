@@ -449,9 +449,12 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
     <div class="section-desc" style="margin-top:18px;">バーコード</div>
     <ul class="tx-list" id="barcode-list">${barcodeListHtml(p)}</ul>
     <div class="form-row-inline">
-      <div class="form-row">
-        <label for="new-barcode">コード</label>
-        <input id="new-barcode" type="text" inputmode="numeric" placeholder="例: 4901234567890" />
+      <div class="field-with-scan">
+        <div class="form-row">
+          <label for="new-barcode">コード</label>
+          <input id="new-barcode" type="text" inputmode="numeric" placeholder="例: 4901234567890" />
+        </div>
+        <button type="button" class="field-scan-btn" id="new-barcode-scan-btn" aria-label="カメラで読み取る">📷</button>
       </div>
       <div class="form-row" style="flex:0 0 80px;">
         <label for="new-barcode-qty">数量</label>
@@ -500,6 +503,10 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
         showToast((err as Error).message);
       }
     })();
+  });
+
+  qs<HTMLButtonElement>('#new-barcode-scan-btn', modal).addEventListener('click', () => {
+    scanBarcodeInto(qs<HTMLInputElement>('#new-barcode', modal));
   });
 
   qs<HTMLButtonElement>('#add-barcode-btn', modal).addEventListener('click', () => {
@@ -567,11 +574,17 @@ function refreshCurrentView(): void {
 function addBarcodeRow(container: HTMLElement, barcode = '', qty = 1): void {
   const row = el('div', { class: 'form-row-inline barcode-row' });
   row.innerHTML = `
-    <div class="form-row"><label>バーコード</label><input class="br-code" type="text" inputmode="numeric" value="${escapeHtml(
-      barcode
-    )}" /></div>
+    <div class="field-with-scan">
+      <div class="form-row"><label>バーコード</label><input class="br-code" type="text" inputmode="numeric" value="${escapeHtml(
+        barcode
+      )}" /></div>
+      <button type="button" class="field-scan-btn br-scan" aria-label="カメラで読み取る">📷</button>
+    </div>
     <div class="form-row" style="flex:0 0 80px;"><label>数量</label><input class="br-qty" type="number" inputmode="numeric" min="1" value="${qty}" /></div>
   `;
+  const scanBtn = row.querySelector<HTMLButtonElement>('.br-scan')!;
+  scanBtn.addEventListener('click', () => scanBarcodeInto(row.querySelector<HTMLInputElement>('.br-code')!));
+
   const removeBtn = el('button', { class: 'btn btn-secondary', type: 'button' }, ['×']);
   removeBtn.style.flex = '0 0 auto';
   removeBtn.style.alignSelf = 'flex-end';
@@ -797,6 +810,60 @@ function openAttachBarcodeQuantityStep(code: string, product: ProductDto): void 
 
 let scanner: Html5Qrcode | null = null;
 let scannerBusy = false;
+
+/**
+ * フォーム内のバーコード入力欄に、カメラで読み取った値をその場で入力するための
+ * 使い切りスキャナー。スキャンタブの常駐スキャナーとは別インスタンスとして
+ * フルスクリーンのオーバーレイ上で動かす。
+ */
+function scanBarcodeInto(targetInput: HTMLInputElement): void {
+  const overlay = el('div', { class: 'scan-overlay' });
+  const readerDiv = el('div', { id: 'inline-scan-reader', class: 'scan-reader' });
+  const hint = el('p', { class: 'scan-hint' }, ['バーコードをカメラに写してください']);
+  const cancelBtn = el('button', { class: 'btn btn-secondary btn-block', type: 'button' }, ['キャンセル']);
+  overlay.append(readerDiv, hint, cancelBtn);
+  document.body.append(overlay);
+
+  let tempScanner: Html5Qrcode | null = null;
+  let cleaned = false;
+
+  const cleanup = (): void => {
+    if (cleaned) return;
+    cleaned = true;
+    overlay.remove();
+    void (async () => {
+      if (!tempScanner) return;
+      try {
+        if (tempScanner.isScanning) await tempScanner.stop();
+        tempScanner.clear();
+      } catch {
+        /* ignore */
+      }
+    })();
+  };
+
+  cancelBtn.addEventListener('click', cleanup);
+
+  void (async () => {
+    try {
+      tempScanner = new Html5Qrcode('inline-scan-reader', { useBarCodeDetectorIfSupported: false, verbose: false });
+      await tempScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: { width: 260, height: 160 } },
+        (decodedText) => {
+          targetInput.value = decodedText;
+          targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+          cleanup();
+        },
+        undefined
+      );
+    } catch (err) {
+      showToast('カメラを起動できませんでした(権限・HTTPS接続を確認してください)');
+      console.error(err);
+      cleanup();
+    }
+  })();
+}
 
 async function startScanner(): Promise<void> {
   qs<HTMLParagraphElement>('#scan-hint').hidden = false;
