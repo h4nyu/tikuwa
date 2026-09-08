@@ -404,8 +404,11 @@ function exportReplenishmentCsv(): void {
     columns.push(sorted.slice(c * chunkSize, (c + 1) * chunkSize));
   }
 
+  const totalBoxes = sorted.reduce((sum, p) => sum + computeBoxesNeeded(p.currentStock, p.needed), 0);
+
   const header: (string | number)[] = [];
   for (let c = 0; c < columnCount; c++) header.push('商品名', '補充必要箱数');
+  header.push(`合計${totalBoxes}箱`); // 表の右上に合計箱数を表示する
 
   const rows: (string | number)[][] = [];
   for (let r = 0; r < chunkSize; r++) {
@@ -414,6 +417,7 @@ function exportReplenishmentCsv(): void {
       const p = columns[c][r];
       row.push(p ? p.name : '', p ? computeBoxesNeeded(p.currentStock, p.needed) : '');
     }
+    row.push(''); // 合計欄の列位置に合わせて空欄を入れる
     rows.push(row);
   }
 
