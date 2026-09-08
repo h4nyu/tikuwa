@@ -237,24 +237,29 @@ async function refreshReplenishmentCategoryChips(): Promise<void> {
 // ---- Product list --------------------------------------------------------
 
 /**
- * 刺繍糸は12本入り箱で仕入れるため、補充必要数を箱単位に換算して表示する。
+ * 刺繍糸は12本入り箱で仕入れるため、補充必要数を箱単位に換算する。
  *
  * 現在庫の12本での余り(currentRem)が2本より多い場合、その端数は新たに1本ずつ
- * 買い足せば1箱分(12本)として使い切れるとみなし、箱数を1減らして
- * 「不足分 = (12 - currentRem)本」を別途表示する(例: 現在庫9本→余り9、
- * 3本買い足せば12本=1箱分として消費できるので、その分の箱を減らす)。
+ * 買い足せば1箱分(12本)として使い切れるとみなし、箱数を1減らす
+ * (例: 現在庫9本→余り9、3本買い足せば12本=1箱分として消費できるので、その分の箱を減らす)。
  * 余りが2本以下の場合はそのメリットが小さいため、単純に箱数を切り上げるだけにする。
  */
+function computeBoxesNeeded(currentStock: number, needed: number): number {
+  const currentRem = currentStock % THREAD_BOX_SIZE;
+  const boxesCeil = Math.ceil(needed / THREAD_BOX_SIZE);
+  return currentRem > 2 && boxesCeil > 0 ? boxesCeil - 1 : boxesCeil;
+}
+
 function formatBoxesNeeded(currentStock: number, needed: number): string {
   const currentRem = currentStock % THREAD_BOX_SIZE;
   const boxesCeil = Math.ceil(needed / THREAD_BOX_SIZE);
+  const boxes = computeBoxesNeeded(currentStock, needed);
 
   if (currentRem > 2 && boxesCeil > 0) {
-    const boxes = boxesCeil - 1;
     const extraUnits = THREAD_BOX_SIZE - currentRem;
     return boxes > 0 ? `${boxes}箱+${extraUnits}本` : `${extraUnits}本`;
   }
-  return `${boxesCeil}箱`;
+  return `${boxes}箱`;
 }
 
 function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): HTMLLIElement {
@@ -389,15 +394,8 @@ function exportReplenishmentCsv(): void {
     showToast('補充が必要な商品はありません');
     return;
   }
-  const header = ['商品名', 'カテゴリ', '現在庫', '目標在庫', '不足数', '単位'];
-  const rows = currentReplenishmentProducts.map((p) => [
-    p.name,
-    p.category ?? '',
-    p.currentStock,
-    p.targetStock,
-    p.needed,
-    p.unit,
-  ]);
+  const header = ['商品名', '補充必要箱数'];
+  const rows = currentReplenishmentProducts.map((p) => [p.name, computeBoxesNeeded(p.currentStock, p.needed)]);
   const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
   // ExcelがUTF-8と正しく認識できるようBOMを付与する
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
