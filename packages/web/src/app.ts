@@ -184,12 +184,14 @@ const state: {
   replenishmentCategory: string | null;
   replenishmentSort: ReplenishmentSort;
   listSort: ListSort;
+  deliveryCategory: string;
 } = {
   view: 'list',
   category: null,
   replenishmentCategory: null,
   replenishmentSort: 'needed-desc',
   listSort: 'name',
+  deliveryCategory: '',
 };
 let knownCategories: string[] = [];
 
@@ -1146,10 +1148,13 @@ async function loadDeliveryList(query?: string): Promise<void> {
           (d.category ?? '').toLowerCase().includes(q)
       );
     }
+    if (state.deliveryCategory) {
+      deliveries = deliveries.filter((d) => d.category === state.deliveryCategory);
+    }
     currentDeliveries = deliveries;
     list.innerHTML = '';
     empty.hidden = deliveries.length > 0;
-    empty.textContent = q ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
+    empty.textContent = q || state.deliveryCategory ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
     for (const d of deliveries) {
       const li = el('li', { class: 'delivery-item' });
       const label = d.carrier
@@ -1364,6 +1369,10 @@ function init(): void {
     window.clearTimeout(deliverySearchTimer);
     const value = (e.target as HTMLInputElement).value.trim();
     deliverySearchTimer = window.setTimeout(() => void loadDeliveryList(value), 250);
+  });
+  qs<HTMLSelectElement>('#delivery-category-filter').addEventListener('change', (e) => {
+    state.deliveryCategory = (e.target as HTMLSelectElement).value;
+    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   });
   void fetchKnownProductNames();
   attachSuggestions(
