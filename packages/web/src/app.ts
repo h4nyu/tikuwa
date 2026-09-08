@@ -120,10 +120,18 @@ const Api = {
 
 // ---- View switching ------------------------------------------------------
 
-const state: { view: ViewName; category: string | null; replenishmentCategory: string | null } = {
+type ReplenishmentSort = 'needed-desc' | 'needed-asc' | 'name' | 'category' | 'stock-asc';
+
+const state: {
+  view: ViewName;
+  category: string | null;
+  replenishmentCategory: string | null;
+  replenishmentSort: ReplenishmentSort;
+} = {
   view: 'list',
   category: null,
   replenishmentCategory: null,
+  replenishmentSort: 'needed-desc',
 };
 let knownCategories: string[] = [];
 
@@ -258,6 +266,31 @@ async function loadProductList(query?: string): Promise<void> {
 
 let currentReplenishmentProducts: ProductDto[] = [];
 
+function sortReplenishmentProducts(products: ProductDto[], sort: ReplenishmentSort): ProductDto[] {
+  const sorted = [...products];
+  switch (sort) {
+    case 'needed-asc':
+      sorted.sort((a, b) => a.needed - b.needed);
+      break;
+    case 'name':
+      sorted.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      break;
+    case 'category':
+      sorted.sort(
+        (a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || a.name.localeCompare(b.name, 'ja')
+      );
+      break;
+    case 'stock-asc':
+      sorted.sort((a, b) => a.currentStock - b.currentStock);
+      break;
+    case 'needed-desc':
+    default:
+      sorted.sort((a, b) => b.needed - a.needed);
+      break;
+  }
+  return sorted;
+}
+
 async function loadReplenishmentList(): Promise<void> {
   const list = qs<HTMLUListElement>('#replenishment-list');
   const empty = qs<HTMLParagraphElement>('#replenishment-empty');
@@ -266,6 +299,7 @@ async function loadReplenishmentList(): Promise<void> {
     if (state.replenishmentCategory) {
       products = products.filter((p) => p.category === state.replenishmentCategory);
     }
+    products = sortReplenishmentProducts(products, state.replenishmentSort);
     currentReplenishmentProducts = products;
     list.innerHTML = '';
     empty.hidden = products.length > 0;
@@ -878,6 +912,11 @@ function init(): void {
   qs<HTMLButtonElement>('#refresh-replenishment').addEventListener('click', (e) => {
     spinIcon(e.currentTarget as HTMLButtonElement);
     void refreshReplenishmentCategoryChips();
+    void loadReplenishmentList();
+  });
+
+  qs<HTMLSelectElement>('#replenishment-sort').addEventListener('change', (e) => {
+    state.replenishmentSort = (e.target as HTMLSelectElement).value as ReplenishmentSort;
     void loadReplenishmentList();
   });
 

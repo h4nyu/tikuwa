@@ -39,6 +39,16 @@
           <p class="section-desc">目標在庫数に対して不足している商品です。</p>
           <button id="refresh-replenishment" class="icon-btn" type="button" aria-label="補充リストを更新">🔄</button>
         </div>
+        <div class="sort-row">
+          <label for="replenishment-sort" class="sort-label">並び順</label>
+          <select id="replenishment-sort">
+            <option value="needed-desc">不足数が多い順</option>
+            <option value="needed-asc">不足数が少ない順</option>
+            <option value="name">商品名順</option>
+            <option value="category">カテゴリ順</option>
+            <option value="stock-asc">現在庫が少ない順</option>
+          </select>
+        </div>
         <div id="category-filter-replenishment" class="chip-row"></div>
         <button id="export-replenishment-csv" class="btn btn-secondary btn-block" style="margin-bottom: 10px;">
           CSVで書き出す(Excelで開けます)
