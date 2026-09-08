@@ -201,16 +201,6 @@ html, body {
 }
 .scan-hint { text-align: center; color: var(--text-muted); margin: 10px 0; font-size: 0.85rem; }
 
-.scan-result-panel {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 14px;
-  margin-top: 10px;
-}
-.scan-result-panel h3 { margin: 0 0 6px; }
-.scan-result-panel .not-found { color: var(--danger); font-weight: 600; }
-
 .fab {
   position: fixed;
   right: 18px;
