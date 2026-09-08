@@ -86,6 +86,8 @@ export interface DeliveryRecord {
   trackingNumber: string;
   carrier: string | null;
   category: string | null;
+  /** 複数の記録を1つの国際便にまとめて発送する際の、共通の追跡番号 */
+  internationalTrackingNumber: string | null;
   status: DeliveryStatus;
   createdAt: string;
 }
@@ -95,6 +97,7 @@ export interface NewDeliveryRecordInput {
   trackingNumber: string;
   carrier?: string | null;
   category?: string | null;
+  internationalTrackingNumber?: string | null;
 }
 
 export interface UpdateDeliveryRecordInput {
@@ -102,4 +105,5 @@ export interface UpdateDeliveryRecordInput {
   trackingNumber?: string;
   carrier?: string | null;
   category?: string | null;
+  internationalTrackingNumber?: string | null;
 }

@@ -17,6 +17,7 @@ interface DeliveryRow {
   status: string;
   carrier: string | null;
   category: string | null;
+  international_tracking_number: string | null;
   created_at: string;
 }
 
@@ -27,6 +28,7 @@ function toDelivery(row: DeliveryRow): DeliveryRecord {
     trackingNumber: row.tracking_number,
     carrier: row.carrier,
     category: row.category,
+    internationalTrackingNumber: row.international_tracking_number,
     status: row.status as DeliveryStatus,
     createdAt: row.created_at,
   };
@@ -48,12 +50,16 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
     const trackingNumber = input.trackingNumber.trim();
     const carrier = input.carrier?.trim() || null;
     const category = input.category?.trim() || null;
+    const internationalTrackingNumber = input.internationalTrackingNumber?.trim() || null;
     if (!productName) return new ValidationError('商品名を入力してください');
     if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
 
     const info = db
-      .prepare('INSERT INTO delivery_records (product_name, tracking_number, carrier, category) VALUES (?, ?, ?, ?)')
-      .run(productName, trackingNumber, carrier, category);
+      .prepare(
+        `INSERT INTO delivery_records (product_name, tracking_number, carrier, category, international_tracking_number)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(productName, trackingNumber, carrier, category, internationalTrackingNumber);
     const row = asRow<DeliveryRow>(
       db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(info.lastInsertRowid)
     );
@@ -74,12 +80,18 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
         : existingRow.tracking_number;
     const carrier = input.carrier !== undefined ? input.carrier?.trim() || null : existingRow.carrier;
     const category = input.category !== undefined ? input.category?.trim() || null : existingRow.category;
+    const internationalTrackingNumber =
+      input.internationalTrackingNumber !== undefined
+        ? input.internationalTrackingNumber?.trim() || null
+        : existingRow.international_tracking_number;
     if (!productName) return new ValidationError('商品名を入力してください');
     if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
 
     db.prepare(
-      'UPDATE delivery_records SET product_name = ?, tracking_number = ?, carrier = ?, category = ? WHERE id = ?'
-    ).run(productName, trackingNumber, carrier, category, id);
+      `UPDATE delivery_records SET
+        product_name = ?, tracking_number = ?, carrier = ?, category = ?, international_tracking_number = ?
+       WHERE id = ?`
+    ).run(productName, trackingNumber, carrier, category, internationalTrackingNumber, id);
     const row = asRow<DeliveryRow>(db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(id));
     return toDelivery(row);
   };

@@ -16,6 +16,8 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       trackingNumber: String(body.tracking_number ?? ''),
       carrier: body.carrier != null ? String(body.carrier) : null,
       category: body.category != null ? String(body.category) : null,
+      internationalTrackingNumber:
+        body.international_tracking_number != null ? String(body.international_tracking_number) : null,
     });
     if (result instanceof ValidationError) {
       return c.json({ error: result.kind, message: result.message }, 400);
@@ -30,6 +32,7 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       trackingNumber: body.tracking_number as string | undefined,
       carrier: body.carrier as string | null | undefined,
       category: body.category as string | null | undefined,
+      internationalTrackingNumber: body.international_tracking_number as string | null | undefined,
     });
     if (result instanceof ValidationError) {
       return c.json({ error: result.kind, message: result.message }, 400);

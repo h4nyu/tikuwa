@@ -46,6 +46,7 @@ interface DeliveryDto {
   trackingNumber: string;
   carrier: string | null;
   category: string | null;
+  internationalTrackingNumber: string | null;
   status: DeliveryStatus;
   createdAt: string;
 }
@@ -1177,7 +1178,8 @@ async function loadDeliveryList(query?: string): Promise<void> {
           d.productName.toLowerCase().includes(q) ||
           d.trackingNumber.toLowerCase().includes(q) ||
           (d.carrier ?? '').toLowerCase().includes(q) ||
-          (d.category ?? '').toLowerCase().includes(q)
+          (d.category ?? '').toLowerCase().includes(q) ||
+          (d.internationalTrackingNumber ?? '').toLowerCase().includes(q)
       );
     }
     if (state.deliveryCategory) {
@@ -1189,9 +1191,15 @@ async function loadDeliveryList(query?: string): Promise<void> {
     empty.textContent = q || state.deliveryCategory ? '該当する記録がありません。' : 'まだ記録がありません。';
     for (const d of deliveries) {
       const li = el('li', { class: 'delivery-item' });
-      const label = d.carrier
-        ? `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)} ・ ${escapeHtml(d.carrier)}`
-        : `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}`;
+      const label = [
+        d.productName,
+        d.trackingNumber,
+        d.carrier,
+        d.internationalTrackingNumber ? `総:${d.internationalTrackingNumber}` : null,
+      ]
+        .filter((part): part is string => !!part)
+        .map(escapeHtml)
+        .join(' ・ ');
       const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
       li.innerHTML = `
         <div class="delivery-item-top">
@@ -1255,6 +1263,10 @@ function openDeliveryForm(existing?: DeliveryDto): void {
         ${categoryOptions}
       </select>
     </div>
+    <div class="form-row">
+      <label for="d-intl-tracking">総国際追跡番号</label>
+      <input id="d-intl-tracking" type="text" autocomplete="off" placeholder="例: INTL-1234567890(任意)" value="${escapeHtml(existing?.internationalTrackingNumber ?? '')}" />
+    </div>
     <button class="btn btn-primary btn-block" id="d-submit">${isEdit ? '更新する' : '記録する'}</button>
   `);
 
@@ -1269,6 +1281,7 @@ function openDeliveryForm(existing?: DeliveryDto): void {
     const trackingNumber = qs<HTMLInputElement>('#d-tracking-number', modal).value.trim();
     const carrier = qs<HTMLInputElement>('#d-carrier', modal).value.trim();
     const category = qs<HTMLSelectElement>('#d-category', modal).value;
+    const internationalTrackingNumber = qs<HTMLInputElement>('#d-intl-tracking', modal).value.trim();
     if (!productName) return showToast('商品名を入力してください');
     if (!trackingNumber) return showToast('追跡番号を入力してください');
     const payload = {
@@ -1276,6 +1289,7 @@ function openDeliveryForm(existing?: DeliveryDto): void {
       tracking_number: trackingNumber,
       carrier: carrier || null,
       category: category || null,
+      international_tracking_number: internationalTrackingNumber || null,
     };
     void (async () => {
       try {
@@ -1293,7 +1307,6 @@ function openDeliveryForm(existing?: DeliveryDto): void {
 
 function exportDeliveryCsv(): void {
   // CSV書き出しはカテゴリが上海到着(国内転送前)の記録のみを対象にする。
-  // 書き出した記録は国際発送に上がったとみなし、自動でカテゴリを進める(次回の書き出しで重複しないように)。
   void (async () => {
     try {
       const all = await Api.deliveries();
@@ -1312,27 +1325,70 @@ function exportDeliveryCsv(): void {
         showToast('上海到着の記録がありません');
         return;
       }
-      const header = ['商品名', '追跡番号', '運送会社', '記録日時'];
-      const rows = target.map((d) => [d.productName, d.trackingNumber, d.carrier ?? '', d.createdAt]);
-      const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
-      // ExcelがUTF-8と正しく認識できるようBOMを付与する
-      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `物流管理_${new Date().toISOString().slice(0, 10)}.csv`;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
-      await Promise.all(target.map((d) => Api.updateDelivery(d.id, { category: '国際発送' })));
-      showToast(`書き出した${target.length}件を国際発送に更新しました`);
-      void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+      openDeliveryExportModal(target);
     } catch (err) {
       showToast((err as Error).message);
     }
   })();
+}
+
+// 上海到着の記録をまとめて1つの国際便で発送する前提で、共通の総国際追跡番号を入力してもらってから
+// CSVを書き出す。書き出した記録は国際発送に上がったとみなし、カテゴリと総国際追跡番号を自動更新する
+// (次回の書き出しで同じ記録が重複しないように)。
+function openDeliveryExportModal(target: DeliveryDto[]): void {
+  const modal = openModal(`
+    <h2>上海到着の記録を書き出す</h2>
+    <p class="section-desc">${target.length}件を書き出し、国際発送に更新します。</p>
+    <div class="form-row">
+      <label for="export-intl-tracking">総国際追跡番号</label>
+      <input id="export-intl-tracking" type="text" autocomplete="off" placeholder="例: INTL-1234567890" />
+    </div>
+    <button class="btn btn-primary btn-block" id="export-confirm">書き出す</button>
+  `);
+
+  qs<HTMLButtonElement>('#export-confirm', modal).addEventListener('click', () => {
+    const internationalTrackingNumber = qs<HTMLInputElement>('#export-intl-tracking', modal).value.trim();
+    if (!internationalTrackingNumber) return showToast('総国際追跡番号を入力してください');
+    closeModal();
+    void finalizeDeliveryExport(target, internationalTrackingNumber);
+  });
+}
+
+async function finalizeDeliveryExport(target: DeliveryDto[], internationalTrackingNumber: string): Promise<void> {
+  try {
+    const header = ['商品名', '追跡番号', '運送会社', '総国際追跡番号', '記録日時'];
+    const rows = target.map((d) => [
+      d.productName,
+      d.trackingNumber,
+      d.carrier ?? '',
+      internationalTrackingNumber,
+      d.createdAt,
+    ]);
+    const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
+    // ExcelがUTF-8と正しく認識できるようBOMを付与する
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `物流管理_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    await Promise.all(
+      target.map((d) =>
+        Api.updateDelivery(d.id, {
+          category: '国際発送',
+          international_tracking_number: internationalTrackingNumber,
+        })
+      )
+    );
+    showToast(`書き出した${target.length}件を国際発送に更新しました`);
+    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+  } catch (err) {
+    showToast((err as Error).message);
+  }
 }
 
 // ---- Init ------------------------------------------------------------
