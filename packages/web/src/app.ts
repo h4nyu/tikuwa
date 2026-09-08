@@ -1165,12 +1165,19 @@ async function fetchKnownProductNames(): Promise<void> {
 }
 
 let currentDeliveries: DeliveryDto[] = [];
+// CSV書き出し対象としてチェックした記録のID。検索・カテゴリチップで一時的に隠れても選択状態は保持し、
+// 削除された記録のIDだけ一覧再取得時に取り除く。
+const selectedDeliveryIds = new Set<number>();
 
 async function loadDeliveryList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#delivery-list');
   const empty = qs<HTMLParagraphElement>('#delivery-empty');
   try {
     let deliveries = await Api.deliveries();
+    const allIds = new Set(deliveries.map((d) => d.id));
+    for (const id of Array.from(selectedDeliveryIds)) {
+      if (!allIds.has(id)) selectedDeliveryIds.delete(id);
+    }
     const q = (query ?? '').trim().toLowerCase();
     if (q) {
       deliveries = deliveries.filter(
@@ -1201,14 +1208,25 @@ async function loadDeliveryList(query?: string): Promise<void> {
         .map(escapeHtml)
         .join(' ・ ');
       const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
+      const checked = selectedDeliveryIds.has(d.id) ? 'checked' : '';
       li.innerHTML = `
         <div class="delivery-item-top">
-          <span>${label}</span>
+          <div class="delivery-item-main">
+            <input type="checkbox" class="delivery-select-checkbox" data-select-delivery="${d.id}" ${checked} />
+            <span>${label}</span>
+          </div>
           <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
         ${categoryBadge}
       `;
       list.append(li);
+    }
+    for (const checkbox of Array.from(list.querySelectorAll<HTMLInputElement>('[data-select-delivery]'))) {
+      checkbox.addEventListener('change', () => {
+        const id = Number(checkbox.dataset.selectDelivery);
+        if (checkbox.checked) selectedDeliveryIds.add(id);
+        else selectedDeliveryIds.delete(id);
+      });
     }
     for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-edit-delivery]'))) {
       btn.addEventListener('click', () => {
@@ -1306,32 +1324,27 @@ function openDeliveryForm(existing?: DeliveryDto): void {
 }
 
 function exportDeliveryCsv(): void {
-  // CSV書き出しはカテゴリが上海到着(国内転送前)の記録のみを対象にする。
-  // 書き出した記録は国際発送に上がったとみなし、即座にカテゴリを自動更新する
-  // (次回の書き出しで同じ記録が重複しないように)。総国際追跡番号は個別の記録編集で設定済みの値をそのまま書き出す。
+  // CSV書き出しはチェックボックスで選択した記録のみを対象にする。
+  // 選択した記録のうち上海到着のものは、国内転送が済んで国際発送に上がったとみなし、
+  // 書き出しと同時にカテゴリを自動更新する(次回の書き出しで同じ記録を選び直さずに済むように)。
   void (async () => {
     try {
-      const all = await Api.deliveries();
-      const q = qs<HTMLInputElement>('#delivery-search').value.trim().toLowerCase();
-      let target = all.filter((d) => d.category === '上海到着');
-      if (q) {
-        target = target.filter(
-          (d) =>
-            d.productName.toLowerCase().includes(q) ||
-            d.trackingNumber.toLowerCase().includes(q) ||
-            (d.carrier ?? '').toLowerCase().includes(q) ||
-            (d.category ?? '').toLowerCase().includes(q)
-        );
-      }
-      if (!target.length) {
-        showToast('上海到着の記録がありません');
+      if (!selectedDeliveryIds.size) {
+        showToast('書き出す記録にチェックを入れてください');
         return;
       }
-      const header = ['商品名', '追跡番号', '運送会社', '総国際追跡番号', '記録日時'];
+      const all = await Api.deliveries();
+      const target = all.filter((d) => selectedDeliveryIds.has(d.id));
+      if (!target.length) {
+        showToast('書き出す記録にチェックを入れてください');
+        return;
+      }
+      const header = ['商品名', '追跡番号', '運送会社', 'カテゴリ', '総国際追跡番号', '記録日時'];
       const rows = target.map((d) => [
         d.productName,
         d.trackingNumber,
         d.carrier ?? '',
+        d.category ?? '',
         d.internationalTrackingNumber ?? '',
         d.createdAt,
       ]);
@@ -1347,8 +1360,14 @@ function exportDeliveryCsv(): void {
       a.remove();
       URL.revokeObjectURL(url);
 
-      await Promise.all(target.map((d) => Api.updateDelivery(d.id, { category: '国際発送' })));
-      showToast(`書き出した${target.length}件を国際発送に更新しました`);
+      const toPromote = target.filter((d) => d.category === '上海到着');
+      await Promise.all(toPromote.map((d) => Api.updateDelivery(d.id, { category: '国際発送' })));
+      selectedDeliveryIds.clear();
+      showToast(
+        toPromote.length
+          ? `書き出した${target.length}件のうち${toPromote.length}件を国際発送に更新しました`
+          : `${target.length}件を書き出しました`
+      );
       void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
     } catch (err) {
       showToast((err as Error).message);
