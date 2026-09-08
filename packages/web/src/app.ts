@@ -562,9 +562,10 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
       <input id="f-name" type="text" value="${escapeHtml(existing?.name || '')}" />
     </div>
     <div class="form-row-inline">
-      <div class="form-row">
+      <div class="form-row" style="position: relative;">
         <label for="f-category">カテゴリ</label>
-        <input id="f-category" type="text" value="${escapeHtml(existing?.category || '')}" />
+        <input id="f-category" type="text" autocomplete="off" value="${escapeHtml(existing?.category || '')}" />
+        <div id="category-suggestions" class="suggestion-list" hidden></div>
       </div>
       <div class="form-row">
         <label for="f-unit">単位</label>
@@ -606,6 +607,36 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
     addBarcodeRow(rows, prefillBarcode || '', 1);
     qs<HTMLButtonElement>('#add-barcode-row', modal).addEventListener('click', () => addBarcodeRow(rows));
   }
+
+  void fetchKnownCategories();
+  const categoryInput = qs<HTMLInputElement>('#f-category', modal);
+  const suggestionBox = qs<HTMLDivElement>('#category-suggestions', modal);
+
+  function renderCategorySuggestions(): void {
+    const query = categoryInput.value.trim().toLowerCase();
+    const matches = knownCategories.filter((c) => c.toLowerCase() !== query && (!query || c.toLowerCase().includes(query)));
+    suggestionBox.innerHTML = '';
+    if (!matches.length) {
+      suggestionBox.hidden = true;
+      return;
+    }
+    for (const cat of matches) {
+      const item = el('div', { class: 'suggestion-item' }, [cat]);
+      item.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        categoryInput.value = cat;
+        suggestionBox.hidden = true;
+      });
+      suggestionBox.append(item);
+    }
+    suggestionBox.hidden = false;
+  }
+
+  categoryInput.addEventListener('focus', renderCategorySuggestions);
+  categoryInput.addEventListener('input', renderCategorySuggestions);
+  categoryInput.addEventListener('blur', () => {
+    window.setTimeout(() => (suggestionBox.hidden = true), 150);
+  });
 
   qs<HTMLButtonElement>('#f-submit', modal).addEventListener('click', () => {
     const name = qs<HTMLInputElement>('#f-name', modal).value.trim();
