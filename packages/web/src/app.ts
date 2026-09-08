@@ -205,7 +205,7 @@ function showView(view: ViewName): void {
     void refreshReplenishmentCategoryChips();
     void loadReplenishmentList();
   }
-  if (view === 'delivery') void loadDeliveryList();
+  if (view === 'delivery') void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   if (view === 'scan') void startScanner();
 }
 
@@ -1120,13 +1120,20 @@ async function fetchKnownProductNames(): Promise<void> {
   }
 }
 
-async function loadDeliveryList(): Promise<void> {
+async function loadDeliveryList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#delivery-list');
   const empty = qs<HTMLParagraphElement>('#delivery-empty');
   try {
-    const deliveries = await Api.deliveries();
+    let deliveries = await Api.deliveries();
+    const q = (query ?? '').trim().toLowerCase();
+    if (q) {
+      deliveries = deliveries.filter(
+        (d) => d.productName.toLowerCase().includes(q) || d.trackingNumber.toLowerCase().includes(q)
+      );
+    }
     list.innerHTML = '';
     empty.hidden = deliveries.length > 0;
+    empty.textContent = q ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
     for (const d of deliveries) {
       const li = el('li');
       li.innerHTML = `
@@ -1142,7 +1149,7 @@ async function loadDeliveryList(): Promise<void> {
           try {
             await Api.removeDelivery(id);
             showToast('削除しました');
-            void loadDeliveryList();
+            void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
           } catch (err) {
             showToast((err as Error).message);
           }
@@ -1164,6 +1171,7 @@ function submitDelivery(): void {
       await Api.createDelivery({ product_name: productName, tracking_number: trackingNumber });
       qs<HTMLInputElement>('#delivery-product-name').value = '';
       qs<HTMLInputElement>('#delivery-tracking-number').value = '';
+      qs<HTMLInputElement>('#delivery-search').value = '';
       showToast('記録しました');
       void loadDeliveryList();
     } catch (err) {
@@ -1208,9 +1216,16 @@ function init(): void {
 
   qs<HTMLButtonElement>('#refresh-delivery').addEventListener('click', (e) => {
     spinIcon(e.currentTarget as HTMLButtonElement);
-    void loadDeliveryList();
+    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   });
   qs<HTMLButtonElement>('#delivery-submit').addEventListener('click', () => submitDelivery());
+
+  let deliverySearchTimer: number | undefined;
+  qs<HTMLInputElement>('#delivery-search').addEventListener('input', (e) => {
+    window.clearTimeout(deliverySearchTimer);
+    const value = (e.target as HTMLInputElement).value.trim();
+    deliverySearchTimer = window.setTimeout(() => void loadDeliveryList(value), 250);
+  });
   void fetchKnownProductNames();
   attachSuggestions(
     qs<HTMLInputElement>('#delivery-product-name'),
