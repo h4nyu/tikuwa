@@ -92,6 +92,15 @@
           <button id="delivery-select-all" class="btn btn-secondary" type="button">全選択</button>
           <button id="delivery-delete-selected" class="btn btn-secondary" type="button">全削除</button>
         </div>
+        <div class="sort-row">
+          <select id="delivery-bulk-category">
+            <option value="発注済み">発注済み</option>
+            <option value="上海到着">上海到着</option>
+            <option value="国際発送">国際発送</option>
+            <option value="到着済み">到着済み</option>
+          </select>
+          <button id="delivery-bulk-category-apply" class="btn btn-secondary" type="button">カテゴリを一括変更</button>
+        </div>
         <ul id="delivery-list" class="tx-list"></ul>
         <p id="delivery-empty" class="empty-state" hidden>まだ記録がありません。</p>
       </section>
