@@ -863,6 +863,24 @@ function init(): void {
   qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => openProductForm());
   qs<HTMLButtonElement>('#export-replenishment-csv').addEventListener('click', () => exportReplenishmentCsv());
 
+  function spinIcon(btn: HTMLButtonElement): void {
+    btn.classList.remove('spinning');
+    void btn.offsetWidth; // reflow to restart the animation on repeated clicks
+    btn.classList.add('spinning');
+  }
+
+  qs<HTMLButtonElement>('#refresh-list').addEventListener('click', (e) => {
+    spinIcon(e.currentTarget as HTMLButtonElement);
+    void refreshListCategoryChips();
+    void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+  });
+
+  qs<HTMLButtonElement>('#refresh-replenishment').addEventListener('click', (e) => {
+    spinIcon(e.currentTarget as HTMLButtonElement);
+    void refreshReplenishmentCategoryChips();
+    void loadReplenishmentList();
+  });
+
   let searchTimer: number | undefined;
   qs<HTMLInputElement>('#search-input').addEventListener('input', (e) => {
     window.clearTimeout(searchTimer);

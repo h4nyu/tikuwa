@@ -66,9 +66,10 @@ html, body {
 
 .view[hidden] { display: none; }
 
-.search-bar { margin-bottom: 10px; }
+.search-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .search-bar input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 12px 14px;
   border-radius: 12px;
   border: 1px solid var(--border);
@@ -76,6 +77,30 @@ html, body {
   color: var(--text);
   font-size: 1rem;
 }
+
+.icon-btn {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon-btn.spinning { animation: icon-spin 0.6s linear; }
+@keyframes icon-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+.section-header .section-desc { margin: 4px 0; }
 
 .section-desc { color: var(--text-muted); font-size: 0.9rem; margin: 4px 2px 10px; }
 

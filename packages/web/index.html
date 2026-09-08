@@ -21,6 +21,7 @@
       <section id="view-list" class="view">
         <div class="search-bar">
           <input id="search-input" type="search" placeholder="商品名・カテゴリ・バーコードで検索" autocomplete="off" />
+          <button id="refresh-list" class="icon-btn" type="button" aria-label="一覧を更新">🔄</button>
         </div>
         <div id="category-filter" class="chip-row"></div>
         <ul id="product-list" class="product-list"></ul>
@@ -34,7 +35,10 @@
       </section>
 
       <section id="view-replenishment" class="view" hidden>
-        <p class="section-desc">目標在庫数に対して不足している商品です。</p>
+        <div class="section-header">
+          <p class="section-desc">目標在庫数に対して不足している商品です。</p>
+          <button id="refresh-replenishment" class="icon-btn" type="button" aria-label="補充リストを更新">🔄</button>
+        </div>
         <div id="category-filter-replenishment" class="chip-row"></div>
         <button id="export-replenishment-csv" class="btn btn-secondary btn-block" style="margin-bottom: 10px;">
           CSVで書き出す(Excelで開けます)
