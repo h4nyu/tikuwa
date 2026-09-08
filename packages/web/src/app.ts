@@ -1297,23 +1297,42 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
 }
 
 function exportDeliveryCsv(): void {
-  if (!currentDeliveries.length) {
-    showToast('書き出す納品記録がありません');
-    return;
-  }
-  const header = ['商品名', '追跡番号', '運送会社', '状態', '記録日時'];
-  const rows = currentDeliveries.map((d) => [d.productName, d.trackingNumber, d.carrier ?? '', d.status, d.createdAt]);
-  const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
-  // ExcelがUTF-8と正しく認識できるようBOMを付与する
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `納品記録_${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+  // 出荷済み以降は追跡不要になるため、CSV書き出しは発注済み(未発送)の記録のみを対象にする。
+  // 画面の検索欄は絞り込みに使うが、状態フィルタの選択状態には影響されない。
+  void (async () => {
+    try {
+      const all = await Api.deliveries();
+      const q = qs<HTMLInputElement>('#delivery-search').value.trim().toLowerCase();
+      let target = all.filter((d) => d.status === '発注済み');
+      if (q) {
+        target = target.filter(
+          (d) =>
+            d.productName.toLowerCase().includes(q) ||
+            d.trackingNumber.toLowerCase().includes(q) ||
+            (d.carrier ?? '').toLowerCase().includes(q)
+        );
+      }
+      if (!target.length) {
+        showToast('発注済みの納品記録がありません');
+        return;
+      }
+      const header = ['商品名', '追跡番号', '運送会社', '記録日時'];
+      const rows = target.map((d) => [d.productName, d.trackingNumber, d.carrier ?? '', d.createdAt]);
+      const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
+      // ExcelがUTF-8と正しく認識できるようBOMを付与する
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `納品記録_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.append(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast((err as Error).message);
+    }
+  })();
 }
 
 // ---- Init ------------------------------------------------------------
