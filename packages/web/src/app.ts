@@ -394,8 +394,29 @@ function exportReplenishmentCsv(): void {
     showToast('補充が必要な商品はありません');
     return;
   }
-  const header = ['商品名', '補充必要箱数'];
-  const rows = currentReplenishmentProducts.map((p) => [p.name, computeBoxesNeeded(p.currentStock, p.needed)]);
+  // 商品名の自然順(1,2,3...)に並べ、印刷しやすいよう「商品名/箱数」の組を
+  // 4列均等に分割して横に並べる(元の仕入れ先の棚卸し表と同じレイアウト)。
+  const sorted = [...currentReplenishmentProducts].sort((a, b) => naturalCompare(a.name, b.name));
+  const columnCount = 4;
+  const chunkSize = Math.ceil(sorted.length / columnCount);
+  const columns: ProductDto[][] = [];
+  for (let c = 0; c < columnCount; c++) {
+    columns.push(sorted.slice(c * chunkSize, (c + 1) * chunkSize));
+  }
+
+  const header: (string | number)[] = [];
+  for (let c = 0; c < columnCount; c++) header.push('商品名', '補充必要箱数');
+
+  const rows: (string | number)[][] = [];
+  for (let r = 0; r < chunkSize; r++) {
+    const row: (string | number)[] = [];
+    for (let c = 0; c < columnCount; c++) {
+      const p = columns[c][r];
+      row.push(p ? p.name : '', p ? computeBoxesNeeded(p.currentStock, p.needed) : '');
+    }
+    rows.push(row);
+  }
+
   const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
   // ExcelがUTF-8と正しく認識できるようBOMを付与する
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
