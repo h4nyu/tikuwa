@@ -84,33 +84,6 @@
           />
           <button id="refresh-delivery" class="icon-btn" type="button" aria-label="物流管理を更新">🔄</button>
         </div>
-        <div class="section-header">
-          <p class="section-desc">届いた荷物の商品名と追跡番号を記録します。</p>
-        </div>
-        <div class="form-row" style="position: relative;">
-          <label for="delivery-product-name">商品名</label>
-          <input id="delivery-product-name" type="text" autocomplete="off" placeholder="例: 321" />
-          <div id="delivery-product-suggestions" class="suggestion-list" hidden></div>
-        </div>
-        <div class="form-row">
-          <label for="delivery-tracking-number">追跡番号</label>
-          <input id="delivery-tracking-number" type="text" autocomplete="off" placeholder="例: 1234-5678-9012" />
-        </div>
-        <div class="form-row">
-          <label for="delivery-carrier">運送会社</label>
-          <input id="delivery-carrier" type="text" autocomplete="off" placeholder="例: ヤマト運輸(任意)" />
-        </div>
-        <div class="form-row">
-          <label for="delivery-category">カテゴリ</label>
-          <select id="delivery-category">
-            <option value="">未設定</option>
-            <option value="発注済み">発注済み</option>
-            <option value="上海到着">上海到着</option>
-            <option value="国際発送">国際発送</option>
-            <option value="到着済み">到着済み</option>
-          </select>
-        </div>
-        <button id="delivery-submit" class="btn btn-primary btn-block" type="button">記録する</button>
         <div id="delivery-category-filter" class="chip-row"></div>
         <button id="export-delivery-csv" class="btn btn-secondary btn-block" style="margin-top: 10px;">
           CSVで書き出す(Excelで開けます)

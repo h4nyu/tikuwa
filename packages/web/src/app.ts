@@ -207,6 +207,8 @@ function showView(view: ViewName): void {
     if (btn.dataset.view === view) qs('#page-title').textContent = btn.dataset.title || '';
   }
 
+  qs<HTMLButtonElement>('#fab-add').setAttribute('aria-label', view === 'delivery' ? '記録を追加' : '商品を追加');
+
   if (previous === 'scan' && view !== 'scan') void stopScanner();
   if (view === 'list') {
     void refreshListCategoryChips();
@@ -1204,7 +1206,7 @@ async function loadDeliveryList(query?: string): Promise<void> {
       btn.addEventListener('click', () => {
         const id = Number(btn.dataset.editDelivery);
         const delivery = currentDeliveries.find((d) => d.id === id);
-        if (delivery) openDeliveryEditForm(delivery);
+        if (delivery) openDeliveryForm(delivery);
       });
     }
     for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-remove-delivery]'))) {
@@ -1226,86 +1228,61 @@ async function loadDeliveryList(query?: string): Promise<void> {
   }
 }
 
-function submitDelivery(): void {
-  const productName = qs<HTMLInputElement>('#delivery-product-name').value.trim();
-  const trackingNumber = qs<HTMLInputElement>('#delivery-tracking-number').value.trim();
-  const carrier = qs<HTMLInputElement>('#delivery-carrier').value.trim();
-  const category = qs<HTMLSelectElement>('#delivery-category').value;
-  if (!productName) return showToast('商品名を入力してください');
-  if (!trackingNumber) return showToast('追跡番号を入力してください');
-  void (async () => {
-    try {
-      await Api.createDelivery({
-        product_name: productName,
-        tracking_number: trackingNumber,
-        carrier: carrier || null,
-        category: category || null,
-      });
-      qs<HTMLInputElement>('#delivery-product-name').value = '';
-      qs<HTMLInputElement>('#delivery-tracking-number').value = '';
-      qs<HTMLInputElement>('#delivery-carrier').value = '';
-      qs<HTMLSelectElement>('#delivery-category').value = '';
-      qs<HTMLInputElement>('#delivery-search').value = '';
-      showToast('記録しました');
-      void loadDeliveryList();
-    } catch (err) {
-      showToast((err as Error).message);
-    }
-  })();
-}
-
-function openDeliveryEditForm(delivery: DeliveryDto): void {
+function openDeliveryForm(existing?: DeliveryDto): void {
+  const isEdit = !!existing;
   const categoryOptions = DELIVERY_STATUSES.map(
-    (s) => `<option value="${s}" ${delivery.category === s ? 'selected' : ''}>${s}</option>`
+    (s) => `<option value="${s}" ${existing?.category === s ? 'selected' : ''}>${s}</option>`
   ).join('');
   const modal = openModal(`
-    <h2>物流管理の記録を編集</h2>
+    <h2>${isEdit ? '物流管理の記録を編集' : '物流管理の記録を登録'}</h2>
     <div class="form-row" style="position: relative;">
-      <label for="ed-product-name">商品名</label>
-      <input id="ed-product-name" type="text" autocomplete="off" value="${escapeHtml(delivery.productName)}" />
-      <div id="ed-product-suggestions" class="suggestion-list" hidden></div>
+      <label for="d-product-name">商品名</label>
+      <input id="d-product-name" type="text" autocomplete="off" placeholder="例: 321" value="${escapeHtml(existing?.productName ?? '')}" />
+      <div id="d-product-suggestions" class="suggestion-list" hidden></div>
     </div>
     <div class="form-row">
-      <label for="ed-tracking-number">追跡番号</label>
-      <input id="ed-tracking-number" type="text" autocomplete="off" value="${escapeHtml(delivery.trackingNumber)}" />
+      <label for="d-tracking-number">追跡番号</label>
+      <input id="d-tracking-number" type="text" autocomplete="off" placeholder="例: 1234-5678-9012" value="${escapeHtml(existing?.trackingNumber ?? '')}" />
     </div>
     <div class="form-row">
-      <label for="ed-carrier">運送会社</label>
-      <input id="ed-carrier" type="text" autocomplete="off" value="${escapeHtml(delivery.carrier ?? '')}" />
+      <label for="d-carrier">運送会社</label>
+      <input id="d-carrier" type="text" autocomplete="off" placeholder="例: ヤマト運輸(任意)" value="${escapeHtml(existing?.carrier ?? '')}" />
     </div>
     <div class="form-row">
-      <label for="ed-category">カテゴリ</label>
-      <select id="ed-category">
+      <label for="d-category">カテゴリ</label>
+      <select id="d-category">
         <option value="">未設定</option>
         ${categoryOptions}
       </select>
     </div>
-    <button class="btn btn-primary btn-block" id="ed-submit">更新する</button>
+    <button class="btn btn-primary btn-block" id="d-submit">${isEdit ? '更新する' : '記録する'}</button>
   `);
 
   attachSuggestions(
-    qs<HTMLInputElement>('#ed-product-name', modal),
-    qs<HTMLDivElement>('#ed-product-suggestions', modal),
+    qs<HTMLInputElement>('#d-product-name', modal),
+    qs<HTMLDivElement>('#d-product-suggestions', modal),
     () => knownProductNames
   );
 
-  qs<HTMLButtonElement>('#ed-submit', modal).addEventListener('click', () => {
-    const productName = qs<HTMLInputElement>('#ed-product-name', modal).value.trim();
-    const trackingNumber = qs<HTMLInputElement>('#ed-tracking-number', modal).value.trim();
-    const carrier = qs<HTMLInputElement>('#ed-carrier', modal).value.trim();
-    const category = qs<HTMLSelectElement>('#ed-category', modal).value;
+  qs<HTMLButtonElement>('#d-submit', modal).addEventListener('click', () => {
+    const productName = qs<HTMLInputElement>('#d-product-name', modal).value.trim();
+    const trackingNumber = qs<HTMLInputElement>('#d-tracking-number', modal).value.trim();
+    const carrier = qs<HTMLInputElement>('#d-carrier', modal).value.trim();
+    const category = qs<HTMLSelectElement>('#d-category', modal).value;
     if (!productName) return showToast('商品名を入力してください');
     if (!trackingNumber) return showToast('追跡番号を入力してください');
+    const payload = {
+      product_name: productName,
+      tracking_number: trackingNumber,
+      carrier: carrier || null,
+      category: category || null,
+    };
     void (async () => {
       try {
-        await Api.updateDelivery(delivery.id, {
-          product_name: productName,
-          tracking_number: trackingNumber,
-          carrier: carrier || null,
-          category: category || null,
-        });
+        if (isEdit && existing) await Api.updateDelivery(existing.id, payload);
+        else await Api.createDelivery(payload);
         closeModal();
-        showToast('更新しました');
+        showToast(isEdit ? '更新しました' : '記録しました');
         void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
       } catch (err) {
         showToast((err as Error).message);
@@ -1360,7 +1337,10 @@ function init(): void {
     btn.addEventListener('click', () => showView(btn.dataset.view as ViewName));
   }
 
-  qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => openProductForm());
+  qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => {
+    if (state.view === 'delivery') openDeliveryForm();
+    else openProductForm();
+  });
   qs<HTMLButtonElement>('#manual-barcode-btn').addEventListener('click', () => openManualBarcodeEntry());
   qs<HTMLButtonElement>('#export-replenishment-csv').addEventListener('click', () => exportReplenishmentCsv());
 
@@ -1391,7 +1371,6 @@ function init(): void {
     spinIcon(e.currentTarget as HTMLButtonElement);
     void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   });
-  qs<HTMLButtonElement>('#delivery-submit').addEventListener('click', () => submitDelivery());
   qs<HTMLButtonElement>('#export-delivery-csv').addEventListener('click', () => exportDeliveryCsv());
 
   let deliverySearchTimer: number | undefined;
@@ -1402,11 +1381,6 @@ function init(): void {
   });
   renderDeliveryCategoryChips();
   void fetchKnownProductNames();
-  attachSuggestions(
-    qs<HTMLInputElement>('#delivery-product-name'),
-    qs<HTMLDivElement>('#delivery-product-suggestions'),
-    () => knownProductNames
-  );
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
     state.listSort = (e.target as HTMLSelectElement).value as ListSort;
     void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
