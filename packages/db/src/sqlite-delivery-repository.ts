@@ -2,8 +2,10 @@ import type { DatabaseSync } from 'node:sqlite';
 import {
   NotFoundError,
   ValidationError,
+  DELIVERY_STATUSES,
   type DeliveryRepository,
   type DeliveryRecord,
+  type DeliveryStatus,
   type NewDeliveryRecordInput,
 } from '@tikuwa/core';
 
@@ -11,6 +13,7 @@ interface DeliveryRow {
   id: number;
   product_name: string;
   tracking_number: string;
+  status: string;
   created_at: string;
 }
 
@@ -19,6 +22,7 @@ function toDelivery(row: DeliveryRow): DeliveryRecord {
     id: row.id,
     productName: row.product_name,
     trackingNumber: row.tracking_number,
+    status: row.status as DeliveryStatus,
     createdAt: row.created_at,
   };
 }
@@ -49,11 +53,19 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
     return toDelivery(row);
   };
 
+  const updateStatus: DeliveryRepository['updateStatus'] = (id, status) => {
+    if (!DELIVERY_STATUSES.includes(status)) return new ValidationError('不正な状態です');
+    const info = db.prepare('UPDATE delivery_records SET status = ? WHERE id = ?').run(status, id);
+    if (info.changes === 0) return new NotFoundError();
+    const row = asRow<DeliveryRow>(db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(id));
+    return toDelivery(row);
+  };
+
   const remove: DeliveryRepository['remove'] = (id) => {
     const info = db.prepare('DELETE FROM delivery_records WHERE id = ?').run(id);
     if (info.changes === 0) return new NotFoundError();
     return true;
   };
 
-  return { findAll, create, remove };
+  return { findAll, create, updateStatus, remove };
 }

@@ -75,11 +75,16 @@ export interface ProductWithStatus extends Product {
   lowStock: boolean;
 }
 
+/** 納品記録の進捗状態。発注してから手元に届くまでの4段階。 */
+export const DELIVERY_STATUSES = ['発注済み', '上海到着', '国際発送', '到着済み'] as const;
+export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
 /** 発注した荷物が届いた際に、商品名と追跡番号を記録するための納品記録 */
 export interface DeliveryRecord {
   id: number;
   productName: string;
   trackingNumber: string;
+  status: DeliveryStatus;
   createdAt: string;
 }
 

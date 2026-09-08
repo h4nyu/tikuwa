@@ -54,9 +54,25 @@ export function migrate(db: DatabaseSync): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       product_name TEXT NOT NULL,
       tracking_number TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT '発注済み',
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
   `);
+
+  migrateDeliveryStatusColumn(db);
+}
+
+/** 既存のdelivery_recordsテーブルにstatus列が無ければ追加する(状態ボタン機能の追加分)。 */
+function migrateDeliveryStatusColumn(db: DatabaseSync): void {
+  const deliveryTableExists = !!db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='delivery_records'")
+    .get();
+  if (!deliveryTableExists) return;
+
+  const columns = db.prepare('PRAGMA table_info(delivery_records)').all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === 'status')) {
+    db.exec(`ALTER TABLE delivery_records ADD COLUMN status TEXT NOT NULL DEFAULT '発注済み'`);
+  }
 }
 
 /**

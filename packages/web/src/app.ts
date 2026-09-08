@@ -36,10 +36,15 @@ interface TransactionDto {
   createdAt: string;
 }
 
+// 発注してから手元に届くまでの4段階。ボタンをタップすると次の段階に進み、最後の次で最初に戻る。
+const DELIVERY_STATUSES = ['発注済み', '上海到着', '国際発送', '到着済み'] as const;
+type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
+
 interface DeliveryDto {
   id: number;
   productName: string;
   trackingNumber: string;
+  status: DeliveryStatus;
   createdAt: string;
 }
 
@@ -47,6 +52,24 @@ type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery';
 
 // 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
 const THREAD_BOX_SIZE = 12;
+
+function nextDeliveryStatus(status: string): DeliveryStatus {
+  const idx = DELIVERY_STATUSES.indexOf(status as DeliveryStatus);
+  return DELIVERY_STATUSES[(idx + 1) % DELIVERY_STATUSES.length];
+}
+
+function deliveryStatusClass(status: string): string {
+  switch (status) {
+    case '上海到着':
+      return 'status-shanghai';
+    case '国際発送':
+      return 'status-shipping';
+    case '到着済み':
+      return 'status-arrived';
+    default:
+      return 'status-ordered';
+  }
+}
 
 // ---- DOM helpers -----------------------------------------------------
 
@@ -162,6 +185,8 @@ const Api = {
   createDelivery: (data: Record<string, unknown>) =>
     api<DeliveryDto>('/api/deliveries', { method: 'POST', body: JSON.stringify(data) }),
   removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
+  updateDeliveryStatus: (id: number, status: string) =>
+    api<DeliveryDto>(`/api/deliveries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 };
 
 // ---- View switching ------------------------------------------------------
@@ -1135,10 +1160,13 @@ async function loadDeliveryList(query?: string): Promise<void> {
     empty.hidden = deliveries.length > 0;
     empty.textContent = q ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
     for (const d of deliveries) {
-      const li = el('li');
+      const li = el('li', { class: 'delivery-item' });
       li.innerHTML = `
-        <span>${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}</span>
-        <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
+        <div class="delivery-item-top">
+          <span>${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}</span>
+          <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
+        </div>
+        <button type="button" class="status-badge ${deliveryStatusClass(d.status)}" data-status-btn="${d.id}" data-status="${escapeHtml(d.status)}">${escapeHtml(d.status)} ›</button>
       `;
       list.append(li);
     }
@@ -1149,6 +1177,20 @@ async function loadDeliveryList(query?: string): Promise<void> {
           try {
             await Api.removeDelivery(id);
             showToast('削除しました');
+            void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+          } catch (err) {
+            showToast((err as Error).message);
+          }
+        })();
+      });
+    }
+    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-status-btn]'))) {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.statusBtn);
+        const status = nextDeliveryStatus(btn.dataset.status ?? '');
+        void (async () => {
+          try {
+            await Api.updateDeliveryStatus(id, status);
             void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
           } catch (err) {
             showToast((err as Error).message);

@@ -12,6 +12,9 @@
   --warn-bg: #fff6e0;
   --category-bg: #e3f2ec;
   --category-text: #1f7a5c;
+  --info-bg: #e6eefc;
+  --info-text: #2a5db0;
+  --warn-text: #8a6d00;
   --nav-height: 64px;
 }
 
@@ -29,6 +32,9 @@
     --warn-bg: #3a331a;
     --category-bg: #1c2e28;
     --category-text: #6fd1ac;
+    --info-bg: #1c2a3d;
+    --info-text: #7fb0f2;
+    --warn-text: #e0c667;
   }
 }
 
@@ -411,6 +417,23 @@ html, body {
   cursor: pointer;
   padding: 6px 0;
 }
+
+#delivery-list li.delivery-item { flex-direction: column; align-items: stretch; gap: 6px; }
+.delivery-item-top { display: flex; justify-content: space-between; gap: 8px; }
+
+.status-badge {
+  align-self: flex-start;
+  border: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.status-badge.status-ordered { background: var(--border); color: var(--text-muted); }
+.status-badge.status-shanghai { background: var(--info-bg); color: var(--info-text); }
+.status-badge.status-shipping { background: var(--warn-bg); color: var(--warn-text); }
+.status-badge.status-arrived { background: var(--category-bg); color: var(--category-text); }
 
 .toast {
   position: fixed;

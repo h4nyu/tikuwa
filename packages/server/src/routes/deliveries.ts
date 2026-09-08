@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { NotFoundError, ValidationError, type DeliveryRepository } from '@tikuwa/core';
+import { NotFoundError, ValidationError, type DeliveryRepository, type DeliveryStatus } from '@tikuwa/core';
 import { readJson } from '../http-utils';
 
 export function deliveriesRoutes(repo: DeliveryRepository): Hono {
@@ -19,6 +19,18 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       return c.json({ error: result.kind, message: result.message }, 400);
     }
     return c.json(result, 201);
+  });
+
+  app.patch('/:id/status', async (c) => {
+    const body = await readJson(c.req.raw);
+    const result = repo.updateStatus(Number(c.req.param('id')), String(body.status ?? '') as DeliveryStatus);
+    if (result instanceof ValidationError) {
+      return c.json({ error: result.kind, message: result.message }, 400);
+    }
+    if (result instanceof NotFoundError) {
+      return c.json({ error: result.kind, message: result.message }, 404);
+    }
+    return c.json(result);
   });
 
   app.delete('/:id', (c) => {
