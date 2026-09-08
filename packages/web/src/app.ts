@@ -399,7 +399,7 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
                 (t) => `
         <li>
           <span><span class="tx-badge ${t.type}">${txLabel(t.type)}</span> ${escapeHtml(t.note || '')}</span>
-          <span>${t.delta > 0 ? '+' : ''}${t.delta} → ${t.resultingStock}${escapeHtml(p.unit)} ・ ${escapeHtml(
+          <span>${t.delta > 0 ? '+' : ''}${t.delta} → ${t.resultingStock} ${escapeHtml(p.unit)} ・ ${escapeHtml(
                   t.createdAt.slice(5, 16)
                 )}</span>
         </li>`
@@ -658,7 +658,7 @@ function openAttachBarcodeFlow(code: string): void {
         const li = el('li', { class: 'product-card' }, [
           el('div', { class: 'product-info' }, [
             el('div', { class: 'product-name' }, [p.name]),
-            el('div', { class: 'product-meta' }, [`現在庫 ${p.currentStock}${p.unit}`]),
+            el('div', { class: 'product-meta' }, [`現在庫 ${p.currentStock} ${p.unit}`]),
           ]),
         ]);
         li.addEventListener('click', () => openAttachBarcodeQuantityStep(code, p));
@@ -766,7 +766,7 @@ async function onScanSuccess(code: string): Promise<void> {
     const qtyNote = match.matchedBarcode.label ? `${match.matchedBarcode.label} ・ ×${qty}` : `×${qty}`;
     resultPanel.innerHTML = `
       <h3>${escapeHtml(match.name)}</h3>
-      <p class="product-meta">${escapeHtml(qtyNote)} ・ 現在庫: ${match.currentStock}${escapeHtml(match.unit)}(目標 ${
+      <p class="product-meta">${escapeHtml(qtyNote)} ・ 現在庫: ${match.currentStock} ${escapeHtml(match.unit)}(目標 ${
       match.targetStock
     })</p>
       <div class="btn-row">
@@ -808,7 +808,7 @@ async function onScanSuccess(code: string): Promise<void> {
 async function quickScanTx(productId: number, type: 'in' | 'out', qty: number): Promise<void> {
   try {
     const updated = await Api.addTransaction(productId, { type, quantity: qty });
-    showToast(`${txLabel(type)}: 現在 ${updated.currentStock}${updated.unit}`);
+    showToast(`${txLabel(type)}: 現在 ${updated.currentStock} ${updated.unit}`);
     resumeScanning();
   } catch (err) {
     showToast((err as Error).message);
