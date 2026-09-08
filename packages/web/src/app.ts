@@ -236,6 +236,27 @@ async function refreshReplenishmentCategoryChips(): Promise<void> {
 
 // ---- Product list --------------------------------------------------------
 
+/**
+ * 刺繍糸は12本入り箱で仕入れるため、補充必要数を箱単位に換算して表示する。
+ *
+ * 現在庫の12本での余り(currentRem)が2本より多い場合、その端数は新たに1本ずつ
+ * 買い足せば1箱分(12本)として使い切れるとみなし、箱数を1減らして
+ * 「不足分 = (12 - currentRem)本」を別途表示する(例: 現在庫9本→余り9、
+ * 3本買い足せば12本=1箱分として消費できるので、その分の箱を減らす)。
+ * 余りが2本以下の場合はそのメリットが小さいため、単純に箱数を切り上げるだけにする。
+ */
+function formatBoxesNeeded(currentStock: number, needed: number): string {
+  const currentRem = currentStock % THREAD_BOX_SIZE;
+  const boxesCeil = Math.ceil(needed / THREAD_BOX_SIZE);
+
+  if (currentRem > 2 && boxesCeil > 0) {
+    const boxes = boxesCeil - 1;
+    const extraUnits = THREAD_BOX_SIZE - currentRem;
+    return boxes > 0 ? `${boxes}箱+${extraUnits}本` : `${extraUnits}本`;
+  }
+  return `${boxesCeil}箱`;
+}
+
 function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): HTMLLIElement {
   const li = el('li', { class: `product-card${p.lowStock ? ' low-stock' : ''}`, 'data-id': String(p.id) });
   const metaRow = el('div', { class: 'product-meta-row' });
@@ -249,9 +270,7 @@ function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): 
     el('div', { class: 'stock-target' }, [`目標 ${p.targetStock} ${p.unit}`]),
   ]);
   if (opts.showNeeded && p.needed > 0) {
-    // 刺繍糸は12本入り箱で仕入れるため、本数に加えて何箱必要かも表示する(切り上げ)。
-    const boxesNeeded = Math.ceil(p.needed / THREAD_BOX_SIZE);
-    stock.append(el('div', { class: 'needed-badge' }, [`${p.needed}${p.unit}+${boxesNeeded}箱`]));
+    stock.append(el('div', { class: 'needed-badge' }, [formatBoxesNeeded(p.currentStock, p.needed)]));
   }
   li.append(info, stock);
   li.addEventListener('click', () => void openProductDetail(p.id));
