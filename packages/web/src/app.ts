@@ -256,6 +256,8 @@ async function loadProductList(query?: string): Promise<void> {
   }
 }
 
+let currentReplenishmentProducts: ProductDto[] = [];
+
 async function loadReplenishmentList(): Promise<void> {
   const list = qs<HTMLUListElement>('#replenishment-list');
   const empty = qs<HTMLParagraphElement>('#replenishment-empty');
@@ -264,12 +266,45 @@ async function loadReplenishmentList(): Promise<void> {
     if (state.replenishmentCategory) {
       products = products.filter((p) => p.category === state.replenishmentCategory);
     }
+    currentReplenishmentProducts = products;
     list.innerHTML = '';
     empty.hidden = products.length > 0;
     for (const p of products) list.append(renderProductCard(p, { showNeeded: true }));
   } catch (err) {
     showToast((err as Error).message);
   }
+}
+
+function toCsvField(value: string | number): string {
+  const str = String(value);
+  return /[",\r\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+}
+
+function exportReplenishmentCsv(): void {
+  if (!currentReplenishmentProducts.length) {
+    showToast('補充が必要な商品はありません');
+    return;
+  }
+  const header = ['商品名', 'カテゴリ', '現在庫', '目標在庫', '不足数', '単位'];
+  const rows = currentReplenishmentProducts.map((p) => [
+    p.name,
+    p.category ?? '',
+    p.currentStock,
+    p.targetStock,
+    p.needed,
+    p.unit,
+  ]);
+  const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
+  // ExcelがUTF-8と正しく認識できるようBOMを付与する
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `補充リスト_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ---- Modal ----------------------------------------------------------------
@@ -794,6 +829,7 @@ function init(): void {
   }
 
   qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => openProductForm());
+  qs<HTMLButtonElement>('#export-replenishment-csv').addEventListener('click', () => exportReplenishmentCsv());
 
   let searchTimer: number | undefined;
   qs<HTMLInputElement>('#search-input').addEventListener('input', (e) => {
