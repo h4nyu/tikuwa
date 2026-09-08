@@ -1293,6 +1293,7 @@ function openDeliveryForm(existing?: DeliveryDto): void {
 
 function exportDeliveryCsv(): void {
   // CSV書き出しはカテゴリが上海到着(国内転送前)の記録のみを対象にする。
+  // 書き出した記録は国際発送に上がったとみなし、自動でカテゴリを進める(次回の書き出しで重複しないように)。
   void (async () => {
     try {
       const all = await Api.deliveries();
@@ -1324,6 +1325,10 @@ function exportDeliveryCsv(): void {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+
+      await Promise.all(target.map((d) => Api.updateDelivery(d.id, { category: '国際発送' })));
+      showToast(`書き出した${target.length}件を国際発送に更新しました`);
+      void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
     } catch (err) {
       showToast((err as Error).message);
     }
