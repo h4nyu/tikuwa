@@ -636,7 +636,7 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
       <label for="tx-note">メモ(任意)</label>
       <input id="tx-note" type="text" placeholder="例: スーパーで購入" />
     </div>
-    <button class="btn btn-primary btn-block" id="tx-submit">記録する</button>
+    <button class="btn btn-primary btn-block" id="tx-submit">記録</button>
 
     <ul class="tx-list">
       ${
@@ -678,7 +678,7 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
     <button class="btn btn-secondary btn-block" id="add-barcode-btn">バーコードを追加</button>
 
     <div class="btn-row" style="margin-top:18px;">
-      <button class="btn btn-secondary" id="edit-btn">編集する</button>
+      <button class="btn btn-secondary" id="edit-btn">編集</button>
       <button class="btn btn-danger" id="delete-btn">削除</button>
     </div>
   `);
@@ -868,7 +868,7 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
             <button type="button" class="btn btn-secondary" id="add-barcode-row">+ バーコードを追加</button>
           </div>`
     }
-    <button class="btn btn-primary btn-block" id="f-submit">${isEdit ? '更新する' : '登録する'}</button>
+    <button class="btn btn-primary btn-block" id="f-submit">${isEdit ? '更新' : '登録'}</button>
   `);
 
   if (!isEdit) {
