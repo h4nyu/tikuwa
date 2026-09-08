@@ -106,17 +106,18 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 | POST | `/api/products/:id/barcodes` | バーコードを追加(`quantity_per_scan`で箱・ケース等の数量を指定) |
 | DELETE | `/api/products/:id/barcodes/:barcodeId` | バーコードを削除 |
 | GET | `/api/deliveries` | 納品記録の一覧(新しい順) |
-| POST | `/api/deliveries` | 納品記録を追加(`product_name`・`tracking_number`・`carrier`(任意)) |
-| PUT | `/api/deliveries/:id` | 納品記録を編集(`product_name`・`tracking_number`・`carrier`) |
+| POST | `/api/deliveries` | 納品記録を追加(`product_name`・`tracking_number`・`carrier`(任意)・`category`(任意)) |
+| PUT | `/api/deliveries/:id` | 納品記録を編集(`product_name`・`tracking_number`・`carrier`・`category`) |
 | PATCH | `/api/deliveries/:id/status` | 納品記録の状態を更新(`status`) |
 | DELETE | `/api/deliveries/:id` | 納品記録を削除 |
 
 ## 納品記録
 
-下部ナビの「納品」タブでは、発注した荷物が届いた際に商品名(候補入力あり)・追跡番号・運送会社(任意)を
-記録できる。商品の在庫数とは連動しない、単純な記録用の一覧(新しい順)。画面最上部の検索欄で
-商品名・追跡番号・運送会社の部分一致検索ができる。
-各記録の「編集」リンクから商品名・追跡番号・運送会社を後から修正できる。
+下部ナビの「納品」タブでは、発注した荷物が届いた際に商品名(候補入力あり)・追跡番号・運送会社(任意)・
+カテゴリ(任意・商品のカテゴリ候補入力あり)を記録できる。商品の在庫数とは連動しない、単純な記録用の
+一覧(新しい順)。画面最上部の検索欄で商品名・追跡番号・運送会社・カテゴリの部分一致検索ができる。
+各記録の「編集」リンクから商品名・追跡番号・運送会社・カテゴリを後から修正できる。
+カテゴリを設定すると、記録一覧で状態ボタンと同じ並びに(商品一覧と同じ配色の)カテゴリバッジとして表示される。
 
 各記録には「発注済み」「上海到着」「国際発送」「到着済み」の4つの状態ボタンが並んでおり、
 タップした状態に直接切り替わる(現在の状態のボタンだけが色付きで強調表示される)。

@@ -16,6 +16,7 @@ interface DeliveryRow {
   tracking_number: string;
   status: string;
   carrier: string | null;
+  category: string | null;
   created_at: string;
 }
 
@@ -25,6 +26,7 @@ function toDelivery(row: DeliveryRow): DeliveryRecord {
     productName: row.product_name,
     trackingNumber: row.tracking_number,
     carrier: row.carrier,
+    category: row.category,
     status: row.status as DeliveryStatus,
     createdAt: row.created_at,
   };
@@ -45,12 +47,13 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
     const productName = input.productName.trim();
     const trackingNumber = input.trackingNumber.trim();
     const carrier = input.carrier?.trim() || null;
+    const category = input.category?.trim() || null;
     if (!productName) return new ValidationError('商品名を入力してください');
     if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
 
     const info = db
-      .prepare('INSERT INTO delivery_records (product_name, tracking_number, carrier) VALUES (?, ?, ?)')
-      .run(productName, trackingNumber, carrier);
+      .prepare('INSERT INTO delivery_records (product_name, tracking_number, carrier, category) VALUES (?, ?, ?, ?)')
+      .run(productName, trackingNumber, carrier, category);
     const row = asRow<DeliveryRow>(
       db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(info.lastInsertRowid)
     );
@@ -70,15 +73,13 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
         ? input.trackingNumber.trim()
         : existingRow.tracking_number;
     const carrier = input.carrier !== undefined ? input.carrier?.trim() || null : existingRow.carrier;
+    const category = input.category !== undefined ? input.category?.trim() || null : existingRow.category;
     if (!productName) return new ValidationError('商品名を入力してください');
     if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
 
-    db.prepare('UPDATE delivery_records SET product_name = ?, tracking_number = ?, carrier = ? WHERE id = ?').run(
-      productName,
-      trackingNumber,
-      carrier,
-      id
-    );
+    db.prepare(
+      'UPDATE delivery_records SET product_name = ?, tracking_number = ?, carrier = ?, category = ? WHERE id = ?'
+    ).run(productName, trackingNumber, carrier, category, id);
     const row = asRow<DeliveryRow>(db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(id));
     return toDelivery(row);
   };

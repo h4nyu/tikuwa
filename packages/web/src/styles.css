@@ -420,6 +420,7 @@ html, body {
 
 #delivery-list li.delivery-item { flex-direction: column; align-items: stretch; gap: 6px; }
 .delivery-item-top { display: flex; justify-content: space-between; gap: 8px; }
+.delivery-item > .category-badge { align-self: flex-start; }
 
 .status-btn-group { display: flex; flex-wrap: wrap; gap: 6px; }
 

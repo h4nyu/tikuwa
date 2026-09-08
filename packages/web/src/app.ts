@@ -45,6 +45,7 @@ interface DeliveryDto {
   productName: string;
   trackingNumber: string;
   carrier: string | null;
+  category: string | null;
   status: DeliveryStatus;
   createdAt: string;
 }
@@ -1156,7 +1157,8 @@ async function loadDeliveryList(query?: string): Promise<void> {
         (d) =>
           d.productName.toLowerCase().includes(q) ||
           d.trackingNumber.toLowerCase().includes(q) ||
-          (d.carrier ?? '').toLowerCase().includes(q)
+          (d.carrier ?? '').toLowerCase().includes(q) ||
+          (d.category ?? '').toLowerCase().includes(q)
       );
     }
     currentDeliveries = deliveries;
@@ -1172,11 +1174,13 @@ async function loadDeliveryList(query?: string): Promise<void> {
         (s) =>
           `<button type="button" class="status-badge ${deliveryStatusClass(s)} ${s === d.status ? 'active' : ''}" data-set-status="${d.id}" data-status-value="${s}">${s}</button>`
       ).join('');
+      const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
       li.innerHTML = `
         <div class="delivery-item-top">
           <span>${label}</span>
           <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
+        ${categoryBadge}
         <div class="status-btn-group">${statusButtons}</div>
       `;
       list.append(li);
@@ -1225,14 +1229,21 @@ function submitDelivery(): void {
   const productName = qs<HTMLInputElement>('#delivery-product-name').value.trim();
   const trackingNumber = qs<HTMLInputElement>('#delivery-tracking-number').value.trim();
   const carrier = qs<HTMLInputElement>('#delivery-carrier').value.trim();
+  const category = qs<HTMLInputElement>('#delivery-category').value.trim();
   if (!productName) return showToast('商品名を入力してください');
   if (!trackingNumber) return showToast('追跡番号を入力してください');
   void (async () => {
     try {
-      await Api.createDelivery({ product_name: productName, tracking_number: trackingNumber, carrier: carrier || null });
+      await Api.createDelivery({
+        product_name: productName,
+        tracking_number: trackingNumber,
+        carrier: carrier || null,
+        category: category || null,
+      });
       qs<HTMLInputElement>('#delivery-product-name').value = '';
       qs<HTMLInputElement>('#delivery-tracking-number').value = '';
       qs<HTMLInputElement>('#delivery-carrier').value = '';
+      qs<HTMLInputElement>('#delivery-category').value = '';
       qs<HTMLInputElement>('#delivery-search').value = '';
       showToast('記録しました');
       void loadDeliveryList();
@@ -1258,6 +1269,11 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
       <label for="ed-carrier">運送会社</label>
       <input id="ed-carrier" type="text" autocomplete="off" value="${escapeHtml(delivery.carrier ?? '')}" />
     </div>
+    <div class="form-row" style="position: relative;">
+      <label for="ed-category">カテゴリ</label>
+      <input id="ed-category" type="text" autocomplete="off" value="${escapeHtml(delivery.category ?? '')}" />
+      <div id="ed-category-suggestions" class="suggestion-list" hidden></div>
+    </div>
     <button class="btn btn-primary btn-block" id="ed-submit">更新する</button>
   `);
 
@@ -1266,11 +1282,18 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
     qs<HTMLDivElement>('#ed-product-suggestions', modal),
     () => knownProductNames
   );
+  void fetchKnownCategories();
+  attachSuggestions(
+    qs<HTMLInputElement>('#ed-category', modal),
+    qs<HTMLDivElement>('#ed-category-suggestions', modal),
+    () => knownCategories
+  );
 
   qs<HTMLButtonElement>('#ed-submit', modal).addEventListener('click', () => {
     const productName = qs<HTMLInputElement>('#ed-product-name', modal).value.trim();
     const trackingNumber = qs<HTMLInputElement>('#ed-tracking-number', modal).value.trim();
     const carrier = qs<HTMLInputElement>('#ed-carrier', modal).value.trim();
+    const category = qs<HTMLInputElement>('#ed-category', modal).value.trim();
     if (!productName) return showToast('商品名を入力してください');
     if (!trackingNumber) return showToast('追跡番号を入力してください');
     void (async () => {
@@ -1279,6 +1302,7 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
           product_name: productName,
           tracking_number: trackingNumber,
           carrier: carrier || null,
+          category: category || null,
         });
         closeModal();
         showToast('更新しました');
@@ -1303,7 +1327,8 @@ function exportDeliveryCsv(): void {
           (d) =>
             d.productName.toLowerCase().includes(q) ||
             d.trackingNumber.toLowerCase().includes(q) ||
-            (d.carrier ?? '').toLowerCase().includes(q)
+            (d.carrier ?? '').toLowerCase().includes(q) ||
+            (d.category ?? '').toLowerCase().includes(q)
         );
       }
       if (!target.length) {
@@ -1381,6 +1406,12 @@ function init(): void {
     qs<HTMLInputElement>('#delivery-product-name'),
     qs<HTMLDivElement>('#delivery-product-suggestions'),
     () => knownProductNames
+  );
+  void fetchKnownCategories();
+  attachSuggestions(
+    qs<HTMLInputElement>('#delivery-category'),
+    qs<HTMLDivElement>('#delivery-category-suggestions'),
+    () => knownCategories
   );
 
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {

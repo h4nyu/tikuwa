@@ -85,6 +85,7 @@ export interface DeliveryRecord {
   productName: string;
   trackingNumber: string;
   carrier: string | null;
+  category: string | null;
   status: DeliveryStatus;
   createdAt: string;
 }
@@ -93,10 +94,12 @@ export interface NewDeliveryRecordInput {
   productName: string;
   trackingNumber: string;
   carrier?: string | null;
+  category?: string | null;
 }
 
 export interface UpdateDeliveryRecordInput {
   productName?: string;
   trackingNumber?: string;
   carrier?: string | null;
+  category?: string | null;
 }

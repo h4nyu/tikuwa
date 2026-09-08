@@ -15,6 +15,7 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       productName: String(body.product_name ?? ''),
       trackingNumber: String(body.tracking_number ?? ''),
       carrier: body.carrier != null ? String(body.carrier) : null,
+      category: body.category != null ? String(body.category) : null,
     });
     if (result instanceof ValidationError) {
       return c.json({ error: result.kind, message: result.message }, 400);
@@ -28,6 +29,7 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       productName: body.product_name as string | undefined,
       trackingNumber: body.tracking_number as string | undefined,
       carrier: body.carrier as string | null | undefined,
+      category: body.category as string | null | undefined,
     });
     if (result instanceof ValidationError) {
       return c.json({ error: result.kind, message: result.message }, 400);
