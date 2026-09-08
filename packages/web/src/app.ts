@@ -1154,7 +1154,7 @@ async function loadDeliveryList(query?: string): Promise<void> {
     currentDeliveries = deliveries;
     list.innerHTML = '';
     empty.hidden = deliveries.length > 0;
-    empty.textContent = q || state.deliveryCategory ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
+    empty.textContent = q || state.deliveryCategory ? '該当する記録がありません。' : 'まだ記録がありません。';
     for (const d of deliveries) {
       const li = el('li', { class: 'delivery-item' });
       const label = d.carrier
@@ -1229,7 +1229,7 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
     (s) => `<option value="${s}" ${delivery.category === s ? 'selected' : ''}>${s}</option>`
   ).join('');
   const modal = openModal(`
-    <h2>納品記録を編集</h2>
+    <h2>物流管理の記録を編集</h2>
     <div class="form-row" style="position: relative;">
       <label for="ed-product-name">商品名</label>
       <input id="ed-product-name" type="text" autocomplete="off" value="${escapeHtml(delivery.productName)}" />
@@ -1301,7 +1301,7 @@ function exportDeliveryCsv(): void {
         );
       }
       if (!target.length) {
-        showToast('上海到着の納品記録がありません');
+        showToast('上海到着の記録がありません');
         return;
       }
       const header = ['商品名', '追跡番号', '運送会社', '記録日時'];
@@ -1312,7 +1312,7 @@ function exportDeliveryCsv(): void {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `納品記録_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `物流管理_${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.append(a);
       a.click();
       a.remove();
