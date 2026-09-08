@@ -144,10 +144,12 @@ function showView(view: ViewName): void {
 
 function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): HTMLLIElement {
   const li = el('li', { class: `product-card${p.lowStock ? ' low-stock' : ''}`, 'data-id': String(p.id) });
-  const info = el('div', { class: 'product-info' }, [
-    el('div', { class: 'product-name' }, [p.name]),
-    el('div', { class: 'product-meta' }, [productMetaLine(p)]),
-  ]);
+  const metaRow = el('div', { class: 'product-meta-row' });
+  if (p.category) metaRow.append(el('span', { class: 'category-badge' }, [p.category]));
+  if (p.barcodes.length) {
+    metaRow.append(el('span', { class: 'product-meta' }, [`バーコード${p.barcodes.length}件`]));
+  }
+  const info = el('div', { class: 'product-info' }, [el('div', { class: 'product-name' }, [p.name]), metaRow]);
   const stock = el('div', { class: 'product-stock' }, [
     el('div', { class: 'stock-num' }, [`${p.currentStock} ${p.unit}`]),
     el('div', { class: 'stock-target' }, [`目標 ${p.targetStock} ${p.unit}`]),
