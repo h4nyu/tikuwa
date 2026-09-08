@@ -1274,10 +1274,10 @@ function openDeliveryForm(existing?: DeliveryDto): void {
     ${
       isEdit
         ? `<div class="btn-row">
-            <button class="btn btn-primary" id="d-submit">更新する</button>
+            <button class="btn btn-primary" id="d-submit">更新</button>
             <button class="btn btn-danger" id="d-delete">削除</button>
           </div>`
-        : '<button class="btn btn-primary btn-block" id="d-submit">記録する</button>'
+        : '<button class="btn btn-primary btn-block" id="d-submit">記録</button>'
     }
   `);
 
