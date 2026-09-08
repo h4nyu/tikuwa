@@ -1229,7 +1229,7 @@ function submitDelivery(): void {
   const productName = qs<HTMLInputElement>('#delivery-product-name').value.trim();
   const trackingNumber = qs<HTMLInputElement>('#delivery-tracking-number').value.trim();
   const carrier = qs<HTMLInputElement>('#delivery-carrier').value.trim();
-  const category = qs<HTMLInputElement>('#delivery-category').value.trim();
+  const category = qs<HTMLSelectElement>('#delivery-category').value;
   if (!productName) return showToast('商品名を入力してください');
   if (!trackingNumber) return showToast('追跡番号を入力してください');
   void (async () => {
@@ -1243,7 +1243,7 @@ function submitDelivery(): void {
       qs<HTMLInputElement>('#delivery-product-name').value = '';
       qs<HTMLInputElement>('#delivery-tracking-number').value = '';
       qs<HTMLInputElement>('#delivery-carrier').value = '';
-      qs<HTMLInputElement>('#delivery-category').value = '';
+      qs<HTMLSelectElement>('#delivery-category').value = '';
       qs<HTMLInputElement>('#delivery-search').value = '';
       showToast('記録しました');
       void loadDeliveryList();
@@ -1254,6 +1254,9 @@ function submitDelivery(): void {
 }
 
 function openDeliveryEditForm(delivery: DeliveryDto): void {
+  const categoryOptions = DELIVERY_STATUSES.map(
+    (s) => `<option value="${s}" ${delivery.category === s ? 'selected' : ''}>${s}</option>`
+  ).join('');
   const modal = openModal(`
     <h2>納品記録を編集</h2>
     <div class="form-row" style="position: relative;">
@@ -1269,10 +1272,12 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
       <label for="ed-carrier">運送会社</label>
       <input id="ed-carrier" type="text" autocomplete="off" value="${escapeHtml(delivery.carrier ?? '')}" />
     </div>
-    <div class="form-row" style="position: relative;">
+    <div class="form-row">
       <label for="ed-category">カテゴリ</label>
-      <input id="ed-category" type="text" autocomplete="off" value="${escapeHtml(delivery.category ?? '')}" />
-      <div id="ed-category-suggestions" class="suggestion-list" hidden></div>
+      <select id="ed-category">
+        <option value="">未設定</option>
+        ${categoryOptions}
+      </select>
     </div>
     <button class="btn btn-primary btn-block" id="ed-submit">更新する</button>
   `);
@@ -1282,18 +1287,12 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
     qs<HTMLDivElement>('#ed-product-suggestions', modal),
     () => knownProductNames
   );
-  void fetchKnownCategories();
-  attachSuggestions(
-    qs<HTMLInputElement>('#ed-category', modal),
-    qs<HTMLDivElement>('#ed-category-suggestions', modal),
-    () => knownCategories
-  );
 
   qs<HTMLButtonElement>('#ed-submit', modal).addEventListener('click', () => {
     const productName = qs<HTMLInputElement>('#ed-product-name', modal).value.trim();
     const trackingNumber = qs<HTMLInputElement>('#ed-tracking-number', modal).value.trim();
     const carrier = qs<HTMLInputElement>('#ed-carrier', modal).value.trim();
-    const category = qs<HTMLInputElement>('#ed-category', modal).value.trim();
+    const category = qs<HTMLSelectElement>('#ed-category', modal).value;
     if (!productName) return showToast('商品名を入力してください');
     if (!trackingNumber) return showToast('追跡番号を入力してください');
     void (async () => {
@@ -1407,13 +1406,6 @@ function init(): void {
     qs<HTMLDivElement>('#delivery-product-suggestions'),
     () => knownProductNames
   );
-  void fetchKnownCategories();
-  attachSuggestions(
-    qs<HTMLInputElement>('#delivery-category'),
-    qs<HTMLDivElement>('#delivery-category-suggestions'),
-    () => knownCategories
-  );
-
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
     state.listSort = (e.target as HTMLSelectElement).value as ListSort;
     void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());

@@ -100,10 +100,15 @@
           <label for="delivery-carrier">運送会社</label>
           <input id="delivery-carrier" type="text" autocomplete="off" placeholder="例: ヤマト運輸(任意)" />
         </div>
-        <div class="form-row" style="position: relative;">
+        <div class="form-row">
           <label for="delivery-category">カテゴリ</label>
-          <input id="delivery-category" type="text" autocomplete="off" placeholder="例: 刺繍糸(任意)" />
-          <div id="delivery-category-suggestions" class="suggestion-list" hidden></div>
+          <select id="delivery-category">
+            <option value="">未設定</option>
+            <option value="発注済み">発注済み</option>
+            <option value="上海到着">上海到着</option>
+            <option value="国際発送">国際発送</option>
+            <option value="到着済み">到着済み</option>
+          </select>
         </div>
         <button id="delivery-submit" class="btn btn-primary btn-block" type="button">記録する</button>
         <button id="export-delivery-csv" class="btn btn-secondary btn-block" style="margin-top: 10px;">
