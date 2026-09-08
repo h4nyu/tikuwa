@@ -184,6 +184,7 @@ interface CategoryChipController {
   getSelected: () => string | null;
   setSelected: (cat: string | null) => void;
   onChange: () => void;
+  getCategoryLabel?: (cat: string) => string;
 }
 
 function renderCategoryChips(ctl: CategoryChipController): void {
@@ -204,7 +205,10 @@ function renderCategoryChips(ctl: CategoryChipController): void {
   bar.append(allChip);
 
   for (const cat of knownCategories) {
-    const chip = el('button', { class: `chip${ctl.getSelected() === cat ? ' active' : ''}`, type: 'button' }, [cat]);
+    const label = ctl.getCategoryLabel ? ctl.getCategoryLabel(cat) : cat;
+    const chip = el('button', { class: `chip${ctl.getSelected() === cat ? ' active' : ''}`, type: 'button' }, [
+      label,
+    ]);
     chip.addEventListener('click', () => selectCategory(cat));
     bar.append(chip);
   }
@@ -221,17 +225,40 @@ async function refreshListCategoryChips(): Promise<void> {
   });
 }
 
-async function refreshReplenishmentCategoryChips(): Promise<void> {
-  await fetchKnownCategories();
-  if (state.replenishmentCategory && !knownCategories.includes(state.replenishmentCategory)) {
-    state.replenishmentCategory = null;
+// カテゴリごとの補充必要箱数の合計をチップに表示するため、カテゴリ絞り込み前の
+// 全補充対象を保持しておく(補充リストのカテゴリチップ専用)。
+let allReplenishmentProducts: ProductDto[] = [];
+
+function replenishmentBoxTotalsByCategory(): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const p of allReplenishmentProducts) {
+    if (!p.category) continue;
+    const boxes = computeBoxesNeeded(p.currentStock, p.needed);
+    totals.set(p.category, (totals.get(p.category) ?? 0) + boxes);
   }
+  return totals;
+}
+
+function renderReplenishmentCategoryChipsNow(): void {
+  const totals = replenishmentBoxTotalsByCategory();
   renderCategoryChips({
     containerId: 'category-filter-replenishment',
     getSelected: () => state.replenishmentCategory,
     setSelected: (cat) => (state.replenishmentCategory = cat),
     onChange: () => void loadReplenishmentList(),
+    getCategoryLabel: (cat) => {
+      const total = totals.get(cat) ?? 0;
+      return total > 0 ? `${cat}(${total}箱)` : cat;
+    },
   });
+}
+
+async function refreshReplenishmentCategoryChips(): Promise<void> {
+  await fetchKnownCategories();
+  if (state.replenishmentCategory && !knownCategories.includes(state.replenishmentCategory)) {
+    state.replenishmentCategory = null;
+  }
+  renderReplenishmentCategoryChipsNow();
 }
 
 // ---- Product list --------------------------------------------------------
@@ -370,10 +397,12 @@ async function loadReplenishmentList(): Promise<void> {
   const list = qs<HTMLUListElement>('#replenishment-list');
   const empty = qs<HTMLParagraphElement>('#replenishment-empty');
   try {
-    let products = await Api.replenishment();
-    if (state.replenishmentCategory) {
-      products = products.filter((p) => p.category === state.replenishmentCategory);
-    }
+    allReplenishmentProducts = await Api.replenishment();
+    renderReplenishmentCategoryChipsNow();
+
+    let products = state.replenishmentCategory
+      ? allReplenishmentProducts.filter((p) => p.category === state.replenishmentCategory)
+      : allReplenishmentProducts;
     products = sortReplenishmentProducts(products, state.replenishmentSort);
     currentReplenishmentProducts = products;
     list.innerHTML = '';
