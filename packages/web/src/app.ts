@@ -837,7 +837,11 @@ let resumeScanningOnModalClose: (() => void) | null = null;
 async function onScanSuccess(code: string): Promise<void> {
   if (scannerBusy) return;
   scannerBusy = true;
-  scanner?.pause(true);
+  try {
+    scanner?.pause(true);
+  } catch {
+    /* カメラが起動していない(手動入力のみ利用中)場合など、スキャン中でなければ無視する */
+  }
   qs<HTMLParagraphElement>('#scan-hint').hidden = true;
 
   resumeScanningOnModalClose = resumeScanning;
@@ -852,7 +856,41 @@ async function onScanSuccess(code: string): Promise<void> {
 function resumeScanning(): void {
   qs<HTMLParagraphElement>('#scan-hint').hidden = false;
   scannerBusy = false;
-  scanner?.resume();
+  try {
+    scanner?.resume();
+  } catch {
+    /* カメラが起動していない(手動入力のみ利用中)場合など、一時停止中でなければ無視する */
+  }
+}
+
+// カメラでの読み取りがうまくいかない場合(端末の不具合・破損したバーコード等)の手動入力。
+// カメラが起動していない場合でも使えるフォールバックになる。
+function openManualBarcodeEntry(): void {
+  const modal = openModal(`
+    <h2>バーコードを手動入力</h2>
+    <div class="form-row">
+      <label for="manual-barcode-input">バーコード番号</label>
+      <input id="manual-barcode-input" type="text" inputmode="numeric" autocomplete="off" placeholder="例: 4901234567890" />
+    </div>
+    <button class="btn btn-primary btn-block" id="manual-barcode-submit">検索する</button>
+  `);
+
+  const input = qs<HTMLInputElement>('#manual-barcode-input', modal);
+  input.focus();
+
+  const submit = (): void => {
+    const code = input.value.trim();
+    if (!code) {
+      showToast('バーコードを入力してください');
+      return;
+    }
+    void onScanSuccess(code);
+  };
+
+  qs<HTMLButtonElement>('#manual-barcode-submit', modal).addEventListener('click', submit);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submit();
+  });
 }
 
 // ---- Init ------------------------------------------------------------
@@ -863,6 +901,7 @@ function init(): void {
   }
 
   qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => openProductForm());
+  qs<HTMLButtonElement>('#manual-barcode-btn').addEventListener('click', () => openManualBarcodeEntry());
   qs<HTMLButtonElement>('#export-replenishment-csv').addEventListener('click', () => exportReplenishmentCsv());
 
   function spinIcon(btn: HTMLButtonElement): void {
