@@ -36,7 +36,7 @@ interface TransactionDto {
   createdAt: string;
 }
 
-// 発注してから手元に届くまでの4段階。記録ごとに4つのボタンを表示し、タップした段階に直接切り替える。
+// 発注してから手元に届くまでの4段階。納品記録の「カテゴリ」選択肢としても使う。
 const DELIVERY_STATUSES = ['発注済み', '上海到着', '国際発送', '到着済み'] as const;
 type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
@@ -54,19 +54,6 @@ type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery';
 
 // 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
 const THREAD_BOX_SIZE = 12;
-
-function deliveryStatusClass(status: string): string {
-  switch (status) {
-    case '上海到着':
-      return 'status-shanghai';
-    case '国際発送':
-      return 'status-shipping';
-    case '到着済み':
-      return 'status-arrived';
-    default:
-      return 'status-ordered';
-  }
-}
 
 // ---- DOM helpers -----------------------------------------------------
 
@@ -184,8 +171,6 @@ const Api = {
   updateDelivery: (id: number, data: Record<string, unknown>) =>
     api<DeliveryDto>(`/api/deliveries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
-  updateDeliveryStatus: (id: number, status: string) =>
-    api<DeliveryDto>(`/api/deliveries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
 };
 
 // ---- View switching ------------------------------------------------------
@@ -1170,10 +1155,6 @@ async function loadDeliveryList(query?: string): Promise<void> {
       const label = d.carrier
         ? `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)} ・ ${escapeHtml(d.carrier)}`
         : `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}`;
-      const statusButtons = DELIVERY_STATUSES.map(
-        (s) =>
-          `<button type="button" class="status-badge ${deliveryStatusClass(s)} ${s === d.status ? 'active' : ''}" data-set-status="${d.id}" data-status-value="${s}">${s}</button>`
-      ).join('');
       const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
       li.innerHTML = `
         <div class="delivery-item-top">
@@ -1181,7 +1162,6 @@ async function loadDeliveryList(query?: string): Promise<void> {
           <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
         ${categoryBadge}
-        <div class="status-btn-group">${statusButtons}</div>
       `;
       list.append(li);
     }
@@ -1199,20 +1179,6 @@ async function loadDeliveryList(query?: string): Promise<void> {
           try {
             await Api.removeDelivery(id);
             showToast('削除しました');
-            void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-          } catch (err) {
-            showToast((err as Error).message);
-          }
-        })();
-      });
-    }
-    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-set-status]'))) {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.setStatus);
-        const status = btn.dataset.statusValue as DeliveryStatus;
-        void (async () => {
-          try {
-            await Api.updateDeliveryStatus(id, status);
             void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
           } catch (err) {
             showToast((err as Error).message);
@@ -1314,13 +1280,12 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
 }
 
 function exportDeliveryCsv(): void {
-  // CSV書き出しは上海到着(国内転送前)の記録のみを対象にする。
-  // 画面の検索欄は絞り込みに使うが、状態フィルタの選択状態には影響されない。
+  // CSV書き出しはカテゴリが上海到着(国内転送前)の記録のみを対象にする。
   void (async () => {
     try {
       const all = await Api.deliveries();
       const q = qs<HTMLInputElement>('#delivery-search').value.trim().toLowerCase();
-      let target = all.filter((d) => d.status === '上海到着');
+      let target = all.filter((d) => d.category === '上海到着');
       if (q) {
         target = target.filter(
           (d) =>
