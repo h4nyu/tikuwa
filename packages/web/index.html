@@ -75,9 +75,27 @@
       </section>
 
       <section id="view-delivery" class="view" hidden>
+        <div class="search-bar">
+          <input
+            id="delivery-search"
+            type="search"
+            placeholder="商品名・追跡番号で検索"
+            autocomplete="off"
+          />
+          <button id="refresh-delivery" class="icon-btn" type="button" aria-label="納品記録を更新">🔄</button>
+        </div>
+        <div class="sort-row">
+          <label for="delivery-status-filter" class="sort-label">状態</label>
+          <select id="delivery-status-filter">
+            <option value="">すべて</option>
+            <option value="発注済み">発注済み</option>
+            <option value="上海到着">上海到着</option>
+            <option value="国際発送">国際発送</option>
+            <option value="到着済み">到着済み</option>
+          </select>
+        </div>
         <div class="section-header">
           <p class="section-desc">届いた荷物の商品名と追跡番号を記録します。</p>
-          <button id="refresh-delivery" class="icon-btn" type="button" aria-label="納品記録を更新">🔄</button>
         </div>
         <div class="form-row" style="position: relative;">
           <label for="delivery-product-name">商品名</label>
@@ -89,14 +107,6 @@
           <input id="delivery-tracking-number" type="text" autocomplete="off" placeholder="例: 1234-5678-9012" />
         </div>
         <button id="delivery-submit" class="btn btn-primary btn-block" type="button">記録する</button>
-        <div class="search-bar" style="margin-top: 16px;">
-          <input
-            id="delivery-search"
-            type="search"
-            placeholder="商品名・追跡番号で検索"
-            autocomplete="off"
-          />
-        </div>
         <ul id="delivery-list" class="tx-list"></ul>
         <p id="delivery-empty" class="empty-state" hidden>まだ納品記録がありません。</p>
       </section>
