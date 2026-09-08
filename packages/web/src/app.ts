@@ -185,6 +185,8 @@ const Api = {
   deliveries: () => api<DeliveryDto[]>('/api/deliveries'),
   createDelivery: (data: Record<string, unknown>) =>
     api<DeliveryDto>('/api/deliveries', { method: 'POST', body: JSON.stringify(data) }),
+  updateDelivery: (id: number, data: Record<string, unknown>) =>
+    api<DeliveryDto>(`/api/deliveries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
   updateDeliveryStatus: (id: number, status: string) =>
     api<DeliveryDto>(`/api/deliveries/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
@@ -1179,11 +1181,18 @@ async function loadDeliveryList(query?: string): Promise<void> {
       li.innerHTML = `
         <div class="delivery-item-top">
           <span>${label}</span>
-          <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
+          <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
         <button type="button" class="status-badge ${deliveryStatusClass(d.status)}" data-status-btn="${d.id}" data-status="${escapeHtml(d.status)}">${escapeHtml(d.status)} ›</button>
       `;
       list.append(li);
+    }
+    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-edit-delivery]'))) {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.editDelivery);
+        const delivery = currentDeliveries.find((d) => d.id === id);
+        if (delivery) openDeliveryEditForm(delivery);
+      });
     }
     for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-remove-delivery]'))) {
       btn.addEventListener('click', () => {
@@ -1237,6 +1246,54 @@ function submitDelivery(): void {
       showToast((err as Error).message);
     }
   })();
+}
+
+function openDeliveryEditForm(delivery: DeliveryDto): void {
+  const modal = openModal(`
+    <h2>納品記録を編集</h2>
+    <div class="form-row" style="position: relative;">
+      <label for="ed-product-name">商品名</label>
+      <input id="ed-product-name" type="text" autocomplete="off" value="${escapeHtml(delivery.productName)}" />
+      <div id="ed-product-suggestions" class="suggestion-list" hidden></div>
+    </div>
+    <div class="form-row">
+      <label for="ed-tracking-number">追跡番号</label>
+      <input id="ed-tracking-number" type="text" autocomplete="off" value="${escapeHtml(delivery.trackingNumber)}" />
+    </div>
+    <div class="form-row">
+      <label for="ed-carrier">運送会社</label>
+      <input id="ed-carrier" type="text" autocomplete="off" value="${escapeHtml(delivery.carrier ?? '')}" />
+    </div>
+    <button class="btn btn-primary btn-block" id="ed-submit">更新する</button>
+  `);
+
+  attachSuggestions(
+    qs<HTMLInputElement>('#ed-product-name', modal),
+    qs<HTMLDivElement>('#ed-product-suggestions', modal),
+    () => knownProductNames
+  );
+
+  qs<HTMLButtonElement>('#ed-submit', modal).addEventListener('click', () => {
+    const productName = qs<HTMLInputElement>('#ed-product-name', modal).value.trim();
+    const trackingNumber = qs<HTMLInputElement>('#ed-tracking-number', modal).value.trim();
+    const carrier = qs<HTMLInputElement>('#ed-carrier', modal).value.trim();
+    if (!productName) return showToast('商品名を入力してください');
+    if (!trackingNumber) return showToast('追跡番号を入力してください');
+    void (async () => {
+      try {
+        await Api.updateDelivery(delivery.id, {
+          product_name: productName,
+          tracking_number: trackingNumber,
+          carrier: carrier || null,
+        });
+        closeModal();
+        showToast('更新しました');
+        void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
 }
 
 function exportDeliveryCsv(): void {

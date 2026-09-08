@@ -7,6 +7,7 @@ import {
   type DeliveryRecord,
   type DeliveryStatus,
   type NewDeliveryRecordInput,
+  type UpdateDeliveryRecordInput,
 } from '@tikuwa/core';
 
 interface DeliveryRow {
@@ -56,6 +57,32 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
     return toDelivery(row);
   };
 
+  const update: DeliveryRepository['update'] = (id, input: UpdateDeliveryRecordInput) => {
+    const existingRow = asRow<DeliveryRow | undefined>(
+      db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(id)
+    );
+    if (!existingRow) return new NotFoundError();
+
+    const productName =
+      input.productName !== undefined && input.productName.trim() ? input.productName.trim() : existingRow.product_name;
+    const trackingNumber =
+      input.trackingNumber !== undefined && input.trackingNumber.trim()
+        ? input.trackingNumber.trim()
+        : existingRow.tracking_number;
+    const carrier = input.carrier !== undefined ? input.carrier?.trim() || null : existingRow.carrier;
+    if (!productName) return new ValidationError('商品名を入力してください');
+    if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
+
+    db.prepare('UPDATE delivery_records SET product_name = ?, tracking_number = ?, carrier = ? WHERE id = ?').run(
+      productName,
+      trackingNumber,
+      carrier,
+      id
+    );
+    const row = asRow<DeliveryRow>(db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(id));
+    return toDelivery(row);
+  };
+
   const updateStatus: DeliveryRepository['updateStatus'] = (id, status) => {
     if (!DELIVERY_STATUSES.includes(status)) return new ValidationError('不正な状態です');
     const info = db.prepare('UPDATE delivery_records SET status = ? WHERE id = ?').run(status, id);
@@ -70,5 +97,5 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
     return true;
   };
 
-  return { findAll, create, updateStatus, remove };
+  return { findAll, create, update, updateStatus, remove };
 }

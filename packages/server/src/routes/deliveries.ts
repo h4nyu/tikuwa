@@ -22,6 +22,22 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
     return c.json(result, 201);
   });
 
+  app.put('/:id', async (c) => {
+    const body = await readJson(c.req.raw);
+    const result = repo.update(Number(c.req.param('id')), {
+      productName: body.product_name as string | undefined,
+      trackingNumber: body.tracking_number as string | undefined,
+      carrier: body.carrier as string | null | undefined,
+    });
+    if (result instanceof ValidationError) {
+      return c.json({ error: result.kind, message: result.message }, 400);
+    }
+    if (result instanceof NotFoundError) {
+      return c.json({ error: result.kind, message: result.message }, 404);
+    }
+    return c.json(result);
+  });
+
   app.patch('/:id/status', async (c) => {
     const body = await readJson(c.req.raw);
     const result = repo.updateStatus(Number(c.req.param('id')), String(body.status ?? '') as DeliveryStatus);

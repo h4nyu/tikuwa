@@ -107,6 +107,7 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 | DELETE | `/api/products/:id/barcodes/:barcodeId` | バーコードを削除 |
 | GET | `/api/deliveries` | 納品記録の一覧(新しい順) |
 | POST | `/api/deliveries` | 納品記録を追加(`product_name`・`tracking_number`・`carrier`(任意)) |
+| PUT | `/api/deliveries/:id` | 納品記録を編集(`product_name`・`tracking_number`・`carrier`) |
 | PATCH | `/api/deliveries/:id/status` | 納品記録の状態を更新(`status`) |
 | DELETE | `/api/deliveries/:id` | 納品記録を削除 |
 
@@ -115,6 +116,7 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 下部ナビの「納品」タブでは、発注した荷物が届いた際に商品名(候補入力あり)・追跡番号・運送会社(任意)を
 記録できる。商品の在庫数とは連動しない、単純な記録用の一覧(新しい順)。画面最上部の検索欄で
 商品名・追跡番号・運送会社の部分一致検索ができ、その下の状態フィルタと組み合わせて絞り込める。
+各記録の「編集」リンクから商品名・追跡番号・運送会社を後から修正できる。
 
 各記録には状態バッジ(ボタン)が付いており、タップすると
 「発注済み → 上海到着 → 国際発送 → 到着済み」の順に進む(到着済みの次は発注済みに戻る)。

@@ -94,3 +94,9 @@ export interface NewDeliveryRecordInput {
   trackingNumber: string;
   carrier?: string | null;
 }
+
+export interface UpdateDeliveryRecordInput {
+  productName?: string;
+  trackingNumber?: string;
+  carrier?: string | null;
+}
