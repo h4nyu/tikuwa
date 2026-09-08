@@ -1215,7 +1215,7 @@ async function loadDeliveryList(query?: string): Promise<void> {
             <input type="checkbox" class="delivery-select-checkbox" data-select-delivery="${d.id}" ${checked} />
             <span>${label}</span>
           </div>
-          <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
+          <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button></span>
         </div>
         ${categoryBadge}
       `;
@@ -1233,20 +1233,6 @@ async function loadDeliveryList(query?: string): Promise<void> {
         const id = Number(btn.dataset.editDelivery);
         const delivery = currentDeliveries.find((d) => d.id === id);
         if (delivery) openDeliveryForm(delivery);
-      });
-    }
-    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-remove-delivery]'))) {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.removeDelivery);
-        void (async () => {
-          try {
-            await Api.removeDelivery(id);
-            showToast('削除しました');
-            void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-          } catch (err) {
-            showToast((err as Error).message);
-          }
-        })();
       });
     }
   } catch (err) {
@@ -1285,7 +1271,14 @@ function openDeliveryForm(existing?: DeliveryDto): void {
       <label for="d-intl-tracking">総国際追跡番号</label>
       <input id="d-intl-tracking" type="text" autocomplete="off" placeholder="例: INTL-1234567890(任意)" value="${escapeHtml(existing?.internationalTrackingNumber ?? '')}" />
     </div>
-    <button class="btn btn-primary btn-block" id="d-submit">${isEdit ? '更新する' : '記録する'}</button>
+    ${
+      isEdit
+        ? `<div class="btn-row">
+            <button class="btn btn-primary" id="d-submit">更新する</button>
+            <button class="btn btn-danger" id="d-delete">削除</button>
+          </div>`
+        : '<button class="btn btn-primary btn-block" id="d-submit">記録する</button>'
+    }
   `);
 
   attachSuggestions(
@@ -1321,6 +1314,22 @@ function openDeliveryForm(existing?: DeliveryDto): void {
       }
     })();
   });
+
+  if (isEdit && existing) {
+    qs<HTMLButtonElement>('#d-delete', modal).addEventListener('click', () => {
+      if (!window.confirm(`「${existing.productName}」の記録を削除しますか?`)) return;
+      void (async () => {
+        try {
+          await Api.removeDelivery(existing.id);
+          closeModal();
+          showToast('削除しました');
+          void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+        } catch (err) {
+          showToast((err as Error).message);
+        }
+      })();
+    });
+  }
 }
 
 function exportDeliveryCsv(): void {
