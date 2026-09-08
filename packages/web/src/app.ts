@@ -38,6 +38,9 @@ interface TransactionDto {
 
 type ViewName = 'list' | 'scan' | 'replenishment';
 
+// 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
+const THREAD_BOX_SIZE = 12;
+
 // ---- DOM helpers -----------------------------------------------------
 
 function qs<T extends HTMLElement>(selector: string, root: ParentNode = document): T {
@@ -246,7 +249,9 @@ function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): 
     el('div', { class: 'stock-target' }, [`目標 ${p.targetStock} ${p.unit}`]),
   ]);
   if (opts.showNeeded && p.needed > 0) {
-    stock.append(el('div', { class: 'needed-badge' }, [`+${p.needed} 必要`]));
+    // 刺繍糸は12本入り箱で仕入れるため、本数に加えて何箱必要かも表示する(切り上げ)。
+    const boxesNeeded = Math.ceil(p.needed / THREAD_BOX_SIZE);
+    stock.append(el('div', { class: 'needed-badge' }, [`${p.needed}${p.unit}+${boxesNeeded}箱`]));
   }
   li.append(info, stock);
   li.addEventListener('click', () => void openProductDetail(p.id));
