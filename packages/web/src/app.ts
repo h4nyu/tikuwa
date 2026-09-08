@@ -36,7 +36,7 @@ interface TransactionDto {
   createdAt: string;
 }
 
-// 発注してから手元に届くまでの4段階。ボタンをタップすると次の段階に進み、最後の次で最初に戻る。
+// 発注してから手元に届くまでの4段階。記録ごとに4つのボタンを表示し、タップした段階に直接切り替える。
 const DELIVERY_STATUSES = ['発注済み', '上海到着', '国際発送', '到着済み'] as const;
 type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
@@ -53,11 +53,6 @@ type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery';
 
 // 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
 const THREAD_BOX_SIZE = 12;
-
-function nextDeliveryStatus(status: string): DeliveryStatus {
-  const idx = DELIVERY_STATUSES.indexOf(status as DeliveryStatus);
-  return DELIVERY_STATUSES[(idx + 1) % DELIVERY_STATUSES.length];
-}
 
 function deliveryStatusClass(status: string): string {
   switch (status) {
@@ -1178,12 +1173,16 @@ async function loadDeliveryList(query?: string): Promise<void> {
       const label = d.carrier
         ? `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)} ・ ${escapeHtml(d.carrier)}`
         : `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}`;
+      const statusButtons = DELIVERY_STATUSES.map(
+        (s) =>
+          `<button type="button" class="status-badge ${deliveryStatusClass(s)} ${s === d.status ? 'active' : ''}" data-set-status="${d.id}" data-status-value="${s}">${s}</button>`
+      ).join('');
       li.innerHTML = `
         <div class="delivery-item-top">
           <span>${label}</span>
           <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button> <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
-        <button type="button" class="status-badge ${deliveryStatusClass(d.status)}" data-status-btn="${d.id}" data-status="${escapeHtml(d.status)}">${escapeHtml(d.status)} ›</button>
+        <div class="status-btn-group">${statusButtons}</div>
       `;
       list.append(li);
     }
@@ -1208,10 +1207,10 @@ async function loadDeliveryList(query?: string): Promise<void> {
         })();
       });
     }
-    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-status-btn]'))) {
+    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-set-status]'))) {
       btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.statusBtn);
-        const status = nextDeliveryStatus(btn.dataset.status ?? '');
+        const id = Number(btn.dataset.setStatus);
+        const status = btn.dataset.statusValue as DeliveryStatus;
         void (async () => {
           try {
             await Api.updateDeliveryStatus(id, status);

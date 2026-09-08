@@ -421,19 +421,22 @@ html, body {
 #delivery-list li.delivery-item { flex-direction: column; align-items: stretch; gap: 6px; }
 .delivery-item-top { display: flex; justify-content: space-between; gap: 8px; }
 
+.status-btn-group { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .status-badge {
-  align-self: flex-start;
-  border: none;
+  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 3px 10px;
   font-size: 0.72rem;
   font-weight: 700;
   cursor: pointer;
+  background: transparent;
+  color: var(--text-muted);
 }
-.status-badge.status-ordered { background: var(--border); color: var(--text-muted); }
-.status-badge.status-shanghai { background: var(--info-bg); color: var(--info-text); }
-.status-badge.status-shipping { background: var(--warn-bg); color: var(--warn-text); }
-.status-badge.status-arrived { background: var(--category-bg); color: var(--category-text); }
+.status-badge.active.status-ordered { background: var(--border); color: var(--text-muted); border-color: transparent; }
+.status-badge.active.status-shanghai { background: var(--info-bg); color: var(--info-text); border-color: transparent; }
+.status-badge.active.status-shipping { background: var(--warn-bg); color: var(--warn-text); border-color: transparent; }
+.status-badge.active.status-arrived { background: var(--category-bg); color: var(--category-text); border-color: transparent; }
 
 .toast {
   position: fixed;
