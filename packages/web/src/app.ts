@@ -120,7 +120,11 @@ const Api = {
 
 // ---- View switching ------------------------------------------------------
 
-const state: { view: ViewName; category: string | null } = { view: 'list', category: null };
+const state: { view: ViewName; category: string | null; replenishmentCategory: string | null } = {
+  view: 'list',
+  category: null,
+  replenishmentCategory: null,
+};
 let knownCategories: string[] = [];
 
 function showView(view: ViewName): void {
@@ -137,50 +141,83 @@ function showView(view: ViewName): void {
 
   if (previous === 'scan' && view !== 'scan') void stopScanner();
   if (view === 'list') {
-    void refreshCategoryChips();
+    void refreshListCategoryChips();
     void loadProductList();
   }
-  if (view === 'replenishment') void loadReplenishmentList();
+  if (view === 'replenishment') {
+    void refreshReplenishmentCategoryChips();
+    void loadReplenishmentList();
+  }
   if (view === 'scan') void startScanner();
 }
 
 // ---- Category filter chips -------------------------------------------------
 
-async function refreshCategoryChips(): Promise<void> {
+async function fetchKnownCategories(): Promise<string[]> {
   try {
     const all = await Api.list();
     const set = new Set<string>();
     for (const p of all) if (p.category) set.add(p.category);
     knownCategories = Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
-    if (state.category && !knownCategories.includes(state.category)) state.category = null;
   } catch {
     /* 取得に失敗しても既存のチップ表示は維持する */
   }
-  renderCategoryChips();
+  return knownCategories;
 }
 
-function renderCategoryChips(): void {
-  const bar = qs<HTMLDivElement>('#category-filter');
+interface CategoryChipController {
+  containerId: string;
+  getSelected: () => string | null;
+  setSelected: (cat: string | null) => void;
+  onChange: () => void;
+}
+
+function renderCategoryChips(ctl: CategoryChipController): void {
+  const bar = qs<HTMLDivElement>(`#${ctl.containerId}`);
   bar.innerHTML = '';
   if (!knownCategories.length) return;
 
   const selectCategory = (cat: string | null): void => {
-    state.category = state.category === cat ? null : cat;
-    renderCategoryChips();
-    void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+    ctl.setSelected(ctl.getSelected() === cat ? null : cat);
+    renderCategoryChips(ctl);
+    ctl.onChange();
   };
 
-  const allChip = el('button', { class: `chip${state.category === null ? ' active' : ''}`, type: 'button' }, [
+  const allChip = el('button', { class: `chip${ctl.getSelected() === null ? ' active' : ''}`, type: 'button' }, [
     'すべて',
   ]);
   allChip.addEventListener('click', () => selectCategory(null));
   bar.append(allChip);
 
   for (const cat of knownCategories) {
-    const chip = el('button', { class: `chip${state.category === cat ? ' active' : ''}`, type: 'button' }, [cat]);
+    const chip = el('button', { class: `chip${ctl.getSelected() === cat ? ' active' : ''}`, type: 'button' }, [cat]);
     chip.addEventListener('click', () => selectCategory(cat));
     bar.append(chip);
   }
+}
+
+async function refreshListCategoryChips(): Promise<void> {
+  await fetchKnownCategories();
+  if (state.category && !knownCategories.includes(state.category)) state.category = null;
+  renderCategoryChips({
+    containerId: 'category-filter',
+    getSelected: () => state.category,
+    setSelected: (cat) => (state.category = cat),
+    onChange: () => void loadProductList(qs<HTMLInputElement>('#search-input').value.trim()),
+  });
+}
+
+async function refreshReplenishmentCategoryChips(): Promise<void> {
+  await fetchKnownCategories();
+  if (state.replenishmentCategory && !knownCategories.includes(state.replenishmentCategory)) {
+    state.replenishmentCategory = null;
+  }
+  renderCategoryChips({
+    containerId: 'category-filter-replenishment',
+    getSelected: () => state.replenishmentCategory,
+    setSelected: (cat) => (state.replenishmentCategory = cat),
+    onChange: () => void loadReplenishmentList(),
+  });
 }
 
 // ---- Product list --------------------------------------------------------
@@ -223,7 +260,10 @@ async function loadReplenishmentList(): Promise<void> {
   const list = qs<HTMLUListElement>('#replenishment-list');
   const empty = qs<HTMLParagraphElement>('#replenishment-empty');
   try {
-    const products = await Api.replenishment();
+    let products = await Api.replenishment();
+    if (state.replenishmentCategory) {
+      products = products.filter((p) => p.category === state.replenishmentCategory);
+    }
     list.innerHTML = '';
     empty.hidden = products.length > 0;
     for (const p of products) list.append(renderProductCard(p, { showNeeded: true }));
@@ -440,10 +480,13 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
 
 function refreshCurrentView(): void {
   if (state.view === 'list') {
-    void refreshCategoryChips();
+    void refreshListCategoryChips();
     void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
   }
-  if (state.view === 'replenishment') void loadReplenishmentList();
+  if (state.view === 'replenishment') {
+    void refreshReplenishmentCategoryChips();
+    void loadReplenishmentList();
+  }
 }
 
 // ---- Add / edit product form ------------------------------------------
@@ -759,7 +802,7 @@ function init(): void {
     searchTimer = window.setTimeout(() => void loadProductList(value), 250);
   });
 
-  void refreshCategoryChips();
+  void refreshListCategoryChips();
   void loadProductList();
 
   // Service Workerを登録しているとiOSでホーム画面追加(standalone)時に
