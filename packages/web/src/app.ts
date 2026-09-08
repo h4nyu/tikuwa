@@ -1382,23 +1382,11 @@ function selectAllDeliveries(): void {
   }
 }
 
-function deleteSelectedDeliveries(): void {
-  if (!selectedDeliveryIds.size) {
-    showToast('削除する記録にチェックを入れてください');
-    return;
+function deselectAllDeliveries(): void {
+  for (const checkbox of Array.from(document.querySelectorAll<HTMLInputElement>('[data-select-delivery]'))) {
+    checkbox.checked = false;
   }
-  if (!window.confirm(`選択した${selectedDeliveryIds.size}件を削除しますか?`)) return;
-  void (async () => {
-    try {
-      const ids = Array.from(selectedDeliveryIds);
-      await Promise.all(ids.map((id) => Api.removeDelivery(id)));
-      selectedDeliveryIds.clear();
-      showToast(`${ids.length}件削除しました`);
-      void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-    } catch (err) {
-      showToast((err as Error).message);
-    }
-  })();
+  selectedDeliveryIds.clear();
 }
 
 function applyBulkDeliveryCategory(): void {
@@ -1463,7 +1451,7 @@ function init(): void {
   });
   qs<HTMLButtonElement>('#export-delivery-csv').addEventListener('click', () => exportDeliveryCsv());
   qs<HTMLButtonElement>('#delivery-select-all').addEventListener('click', () => selectAllDeliveries());
-  qs<HTMLButtonElement>('#delivery-delete-selected').addEventListener('click', () => deleteSelectedDeliveries());
+  qs<HTMLButtonElement>('#delivery-delete-selected').addEventListener('click', () => deselectAllDeliveries());
   qs<HTMLButtonElement>('#delivery-bulk-category-apply').addEventListener('click', () => applyBulkDeliveryCategory());
 
   let deliverySearchTimer: number | undefined;
