@@ -506,10 +506,9 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
   });
 
   qs<HTMLButtonElement>('#new-barcode-scan-btn', modal).addEventListener('click', () => {
-    scanBarcodeInto(qs<HTMLInputElement>('#new-barcode', modal), () => {
-      // 既存商品にバーコードを追加するだけの操作なので、読み取れたらそのまま登録まで進める。
-      qs<HTMLButtonElement>('#add-barcode-btn', modal).click();
-    });
+    // 読み取り結果を入力欄に反映するだけにとどめ、数量・ラベルを確認/修正してから
+    // 手動で「バーコードを追加」を押して確定してもらう。
+    scanBarcodeInto(qs<HTMLInputElement>('#new-barcode', modal));
   });
 
   qs<HTMLButtonElement>('#add-barcode-btn', modal).addEventListener('click', () => {
@@ -819,7 +818,7 @@ let scannerBusy = false;
  * 使い切りスキャナー。スキャンタブの常駐スキャナーとは別インスタンスとして
  * フルスクリーンのオーバーレイ上で動かす。
  */
-function scanBarcodeInto(targetInput: HTMLInputElement, onScanned?: () => void): void {
+function scanBarcodeInto(targetInput: HTMLInputElement): void {
   const overlay = el('div', { class: 'scan-overlay' });
   const readerDiv = el('div', { id: 'inline-scan-reader', class: 'scan-reader' });
   const hint = el('p', { class: 'scan-hint' }, ['バーコードをカメラに写してください']);
@@ -857,7 +856,8 @@ function scanBarcodeInto(targetInput: HTMLInputElement, onScanned?: () => void):
           targetInput.value = decodedText;
           targetInput.dispatchEvent(new Event('input', { bubbles: true }));
           cleanup();
-          onScanned?.();
+          targetInput.focus();
+          showToast('バーコードを読み取りました。内容を確認して追加してください');
         },
         undefined
       );
