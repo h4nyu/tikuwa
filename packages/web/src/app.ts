@@ -1148,6 +1148,8 @@ async function fetchKnownProductNames(): Promise<void> {
   }
 }
 
+let currentDeliveries: DeliveryDto[] = [];
+
 async function loadDeliveryList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#delivery-list');
   const empty = qs<HTMLParagraphElement>('#delivery-empty');
@@ -1165,6 +1167,7 @@ async function loadDeliveryList(query?: string): Promise<void> {
     if (state.deliveryStatus) {
       deliveries = deliveries.filter((d) => d.status === state.deliveryStatus);
     }
+    currentDeliveries = deliveries;
     list.innerHTML = '';
     empty.hidden = deliveries.length > 0;
     empty.textContent = q || state.deliveryStatus ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
@@ -1236,6 +1239,26 @@ function submitDelivery(): void {
   })();
 }
 
+function exportDeliveryCsv(): void {
+  if (!currentDeliveries.length) {
+    showToast('書き出す納品記録がありません');
+    return;
+  }
+  const header = ['商品名', '追跡番号', '運送会社', '状態', '記録日時'];
+  const rows = currentDeliveries.map((d) => [d.productName, d.trackingNumber, d.carrier ?? '', d.status, d.createdAt]);
+  const csv = [header, ...rows].map((row) => row.map(toCsvField).join(',')).join('\r\n');
+  // ExcelがUTF-8と正しく認識できるようBOMを付与する
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `納品記録_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // ---- Init ------------------------------------------------------------
 
 function init(): void {
@@ -1275,6 +1298,7 @@ function init(): void {
     void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   });
   qs<HTMLButtonElement>('#delivery-submit').addEventListener('click', () => submitDelivery());
+  qs<HTMLButtonElement>('#export-delivery-csv').addEventListener('click', () => exportDeliveryCsv());
 
   let deliverySearchTimer: number | undefined;
   qs<HTMLInputElement>('#delivery-search').addEventListener('input', (e) => {
