@@ -44,6 +44,7 @@ interface DeliveryDto {
   id: number;
   productName: string;
   trackingNumber: string;
+  carrier: string | null;
   status: DeliveryStatus;
   createdAt: string;
 }
@@ -1155,7 +1156,10 @@ async function loadDeliveryList(query?: string): Promise<void> {
     const q = (query ?? '').trim().toLowerCase();
     if (q) {
       deliveries = deliveries.filter(
-        (d) => d.productName.toLowerCase().includes(q) || d.trackingNumber.toLowerCase().includes(q)
+        (d) =>
+          d.productName.toLowerCase().includes(q) ||
+          d.trackingNumber.toLowerCase().includes(q) ||
+          (d.carrier ?? '').toLowerCase().includes(q)
       );
     }
     if (state.deliveryStatus) {
@@ -1166,9 +1170,12 @@ async function loadDeliveryList(query?: string): Promise<void> {
     empty.textContent = q || state.deliveryStatus ? '該当する納品記録がありません。' : 'まだ納品記録がありません。';
     for (const d of deliveries) {
       const li = el('li', { class: 'delivery-item' });
+      const label = d.carrier
+        ? `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)} ・ ${escapeHtml(d.carrier)}`
+        : `${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}`;
       li.innerHTML = `
         <div class="delivery-item-top">
-          <span>${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}</span>
+          <span>${label}</span>
           <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
         </div>
         <button type="button" class="status-badge ${deliveryStatusClass(d.status)}" data-status-btn="${d.id}" data-status="${escapeHtml(d.status)}">${escapeHtml(d.status)} ›</button>
@@ -1211,13 +1218,15 @@ async function loadDeliveryList(query?: string): Promise<void> {
 function submitDelivery(): void {
   const productName = qs<HTMLInputElement>('#delivery-product-name').value.trim();
   const trackingNumber = qs<HTMLInputElement>('#delivery-tracking-number').value.trim();
+  const carrier = qs<HTMLInputElement>('#delivery-carrier').value.trim();
   if (!productName) return showToast('商品名を入力してください');
   if (!trackingNumber) return showToast('追跡番号を入力してください');
   void (async () => {
     try {
-      await Api.createDelivery({ product_name: productName, tracking_number: trackingNumber });
+      await Api.createDelivery({ product_name: productName, tracking_number: trackingNumber, carrier: carrier || null });
       qs<HTMLInputElement>('#delivery-product-name').value = '';
       qs<HTMLInputElement>('#delivery-tracking-number').value = '';
+      qs<HTMLInputElement>('#delivery-carrier').value = '';
       qs<HTMLInputElement>('#delivery-search').value = '';
       showToast('記録しました');
       void loadDeliveryList();

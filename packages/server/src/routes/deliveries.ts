@@ -14,6 +14,7 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
     const result = repo.create({
       productName: String(body.product_name ?? ''),
       trackingNumber: String(body.tracking_number ?? ''),
+      carrier: body.carrier != null ? String(body.carrier) : null,
     });
     if (result instanceof ValidationError) {
       return c.json({ error: result.kind, message: result.message }, 400);

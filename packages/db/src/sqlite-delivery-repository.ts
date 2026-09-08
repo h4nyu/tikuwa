@@ -14,6 +14,7 @@ interface DeliveryRow {
   product_name: string;
   tracking_number: string;
   status: string;
+  carrier: string | null;
   created_at: string;
 }
 
@@ -22,6 +23,7 @@ function toDelivery(row: DeliveryRow): DeliveryRecord {
     id: row.id,
     productName: row.product_name,
     trackingNumber: row.tracking_number,
+    carrier: row.carrier,
     status: row.status as DeliveryStatus,
     createdAt: row.created_at,
   };
@@ -41,12 +43,13 @@ export function SqliteDeliveryRepository(db: DatabaseSync): DeliveryRepository {
   const create: DeliveryRepository['create'] = (input: NewDeliveryRecordInput) => {
     const productName = input.productName.trim();
     const trackingNumber = input.trackingNumber.trim();
+    const carrier = input.carrier?.trim() || null;
     if (!productName) return new ValidationError('商品名を入力してください');
     if (!trackingNumber) return new ValidationError('追跡番号を入力してください');
 
     const info = db
-      .prepare('INSERT INTO delivery_records (product_name, tracking_number) VALUES (?, ?)')
-      .run(productName, trackingNumber);
+      .prepare('INSERT INTO delivery_records (product_name, tracking_number, carrier) VALUES (?, ?, ?)')
+      .run(productName, trackingNumber, carrier);
     const row = asRow<DeliveryRow>(
       db.prepare('SELECT * FROM delivery_records WHERE id = ?').get(info.lastInsertRowid)
     );
