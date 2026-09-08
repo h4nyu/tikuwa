@@ -253,13 +253,32 @@ function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): 
   return li;
 }
 
+// 商品名に数字が含まれる場合(例: 刺繍糸の色番号)に "1, 10, 11, 2, ..." のような
+// 文字列順にならないよう、数字部分は数値として比較する自然順ソート。
+function naturalCompare(a: string, b: string): number {
+  const aChunks = a.match(/\d+|\D+/g) ?? [a];
+  const bChunks = b.match(/\d+|\D+/g) ?? [b];
+  const len = Math.max(aChunks.length, bChunks.length);
+  for (let i = 0; i < len; i++) {
+    const ac = aChunks[i] ?? '';
+    const bc = bChunks[i] ?? '';
+    if (ac === bc) continue;
+    if (/^\d+$/.test(ac) && /^\d+$/.test(bc)) {
+      const diff = Number(ac) - Number(bc);
+      if (diff !== 0) return diff;
+      if (ac.length !== bc.length) return ac.length - bc.length;
+      continue;
+    }
+    return ac.localeCompare(bc, 'ja');
+  }
+  return 0;
+}
+
 function sortListProducts(products: ProductDto[], sort: ListSort): ProductDto[] {
   const sorted = [...products];
   switch (sort) {
     case 'category':
-      sorted.sort(
-        (a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || a.name.localeCompare(b.name, 'ja')
-      );
+      sorted.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || naturalCompare(a.name, b.name));
       break;
     case 'stock-asc':
       sorted.sort((a, b) => a.currentStock - b.currentStock);
@@ -272,7 +291,7 @@ function sortListProducts(products: ProductDto[], sort: ListSort): ProductDto[] 
       break;
     case 'name':
     default:
-      sorted.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      sorted.sort((a, b) => naturalCompare(a.name, b.name));
       break;
   }
   return sorted;
@@ -302,12 +321,10 @@ function sortReplenishmentProducts(products: ProductDto[], sort: ReplenishmentSo
       sorted.sort((a, b) => a.needed - b.needed);
       break;
     case 'name':
-      sorted.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      sorted.sort((a, b) => naturalCompare(a.name, b.name));
       break;
     case 'category':
-      sorted.sort(
-        (a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || a.name.localeCompare(b.name, 'ja')
-      );
+      sorted.sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || naturalCompare(a.name, b.name));
       break;
     case 'stock-asc':
       sorted.sort((a, b) => a.currentStock - b.currentStock);
