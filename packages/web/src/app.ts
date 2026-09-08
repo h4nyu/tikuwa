@@ -120,7 +120,8 @@ const Api = {
 
 // ---- View switching ------------------------------------------------------
 
-const state: { view: ViewName } = { view: 'list' };
+const state: { view: ViewName; category: string | null } = { view: 'list', category: null };
+let knownCategories: string[] = [];
 
 function showView(view: ViewName): void {
   const previous = state.view;
@@ -135,9 +136,51 @@ function showView(view: ViewName): void {
   }
 
   if (previous === 'scan' && view !== 'scan') void stopScanner();
-  if (view === 'list') void loadProductList();
+  if (view === 'list') {
+    void refreshCategoryChips();
+    void loadProductList();
+  }
   if (view === 'replenishment') void loadReplenishmentList();
   if (view === 'scan') void startScanner();
+}
+
+// ---- Category filter chips -------------------------------------------------
+
+async function refreshCategoryChips(): Promise<void> {
+  try {
+    const all = await Api.list();
+    const set = new Set<string>();
+    for (const p of all) if (p.category) set.add(p.category);
+    knownCategories = Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
+    if (state.category && !knownCategories.includes(state.category)) state.category = null;
+  } catch {
+    /* 取得に失敗しても既存のチップ表示は維持する */
+  }
+  renderCategoryChips();
+}
+
+function renderCategoryChips(): void {
+  const bar = qs<HTMLDivElement>('#category-filter');
+  bar.innerHTML = '';
+  if (!knownCategories.length) return;
+
+  const selectCategory = (cat: string | null): void => {
+    state.category = state.category === cat ? null : cat;
+    renderCategoryChips();
+    void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+  };
+
+  const allChip = el('button', { class: `chip${state.category === null ? ' active' : ''}`, type: 'button' }, [
+    'すべて',
+  ]);
+  allChip.addEventListener('click', () => selectCategory(null));
+  bar.append(allChip);
+
+  for (const cat of knownCategories) {
+    const chip = el('button', { class: `chip${state.category === cat ? ' active' : ''}`, type: 'button' }, [cat]);
+    chip.addEventListener('click', () => selectCategory(cat));
+    bar.append(chip);
+  }
 }
 
 // ---- Product list --------------------------------------------------------
@@ -166,7 +209,8 @@ async function loadProductList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#product-list');
   const empty = qs<HTMLParagraphElement>('#list-empty');
   try {
-    const products = await Api.list(query);
+    let products = await Api.list(query);
+    if (state.category) products = products.filter((p) => p.category === state.category);
     list.innerHTML = '';
     empty.hidden = products.length > 0;
     for (const p of products) list.append(renderProductCard(p));
@@ -395,7 +439,10 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
 }
 
 function refreshCurrentView(): void {
-  if (state.view === 'list') void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+  if (state.view === 'list') {
+    void refreshCategoryChips();
+    void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+  }
   if (state.view === 'replenishment') void loadReplenishmentList();
 }
 
@@ -712,6 +759,7 @@ function init(): void {
     searchTimer = window.setTimeout(() => void loadProductList(value), 250);
   });
 
+  void refreshCategoryChips();
   void loadProductList();
 
   // Service Workerを登録しているとiOSでホーム画面追加(standalone)時に
