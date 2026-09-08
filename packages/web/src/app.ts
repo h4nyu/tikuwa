@@ -544,7 +544,7 @@ function exportReplenishmentCsv(): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `補充リスト_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `納品リスト_${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.append(a);
   a.click();
   a.remove();
