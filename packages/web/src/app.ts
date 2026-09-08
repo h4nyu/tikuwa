@@ -1297,13 +1297,13 @@ function openDeliveryEditForm(delivery: DeliveryDto): void {
 }
 
 function exportDeliveryCsv(): void {
-  // 出荷済み以降は追跡不要になるため、CSV書き出しは発注済み(未発送)の記録のみを対象にする。
+  // CSV書き出しは上海到着(国内転送前)の記録のみを対象にする。
   // 画面の検索欄は絞り込みに使うが、状態フィルタの選択状態には影響されない。
   void (async () => {
     try {
       const all = await Api.deliveries();
       const q = qs<HTMLInputElement>('#delivery-search').value.trim().toLowerCase();
-      let target = all.filter((d) => d.status === '発注済み');
+      let target = all.filter((d) => d.status === '上海到着');
       if (q) {
         target = target.filter(
           (d) =>
@@ -1313,7 +1313,7 @@ function exportDeliveryCsv(): void {
         );
       }
       if (!target.length) {
-        showToast('発注済みの納品記録がありません');
+        showToast('上海到着の納品記録がありません');
         return;
       }
       const header = ['商品名', '追跡番号', '運送会社', '記録日時'];
