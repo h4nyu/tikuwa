@@ -28,6 +28,16 @@
           />
           <button id="refresh-list" class="icon-btn" type="button" aria-label="一覧を更新">🔄</button>
         </div>
+        <div class="sort-row">
+          <label for="list-sort" class="sort-label">並び順</label>
+          <select id="list-sort">
+            <option value="name">商品名順</option>
+            <option value="category">カテゴリ順</option>
+            <option value="stock-asc">現在庫が少ない順</option>
+            <option value="stock-desc">現在庫が多い順</option>
+            <option value="needed-desc">不足数が多い順</option>
+          </select>
+        </div>
         <div id="category-filter" class="chip-row"></div>
         <ul id="product-list" class="product-list"></ul>
         <p id="list-empty" class="empty-state" hidden>商品がありません。右下の + から登録してください。</p>

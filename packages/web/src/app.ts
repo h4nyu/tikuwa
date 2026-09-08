@@ -121,17 +121,20 @@ const Api = {
 // ---- View switching ------------------------------------------------------
 
 type ReplenishmentSort = 'needed-desc' | 'needed-asc' | 'name' | 'category' | 'stock-asc';
+type ListSort = 'name' | 'category' | 'stock-asc' | 'stock-desc' | 'needed-desc';
 
 const state: {
   view: ViewName;
   category: string | null;
   replenishmentCategory: string | null;
   replenishmentSort: ReplenishmentSort;
+  listSort: ListSort;
 } = {
   view: 'list',
   category: null,
   replenishmentCategory: null,
   replenishmentSort: 'needed-desc',
+  listSort: 'name',
 };
 let knownCategories: string[] = [];
 
@@ -250,12 +253,38 @@ function renderProductCard(p: ProductDto, opts: { showNeeded?: boolean } = {}): 
   return li;
 }
 
+function sortListProducts(products: ProductDto[], sort: ListSort): ProductDto[] {
+  const sorted = [...products];
+  switch (sort) {
+    case 'category':
+      sorted.sort(
+        (a, b) => (a.category ?? '').localeCompare(b.category ?? '', 'ja') || a.name.localeCompare(b.name, 'ja')
+      );
+      break;
+    case 'stock-asc':
+      sorted.sort((a, b) => a.currentStock - b.currentStock);
+      break;
+    case 'stock-desc':
+      sorted.sort((a, b) => b.currentStock - a.currentStock);
+      break;
+    case 'needed-desc':
+      sorted.sort((a, b) => b.needed - a.needed);
+      break;
+    case 'name':
+    default:
+      sorted.sort((a, b) => a.name.localeCompare(b.name, 'ja'));
+      break;
+  }
+  return sorted;
+}
+
 async function loadProductList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#product-list');
   const empty = qs<HTMLParagraphElement>('#list-empty');
   try {
     let products = await Api.list(query);
     if (state.category) products = products.filter((p) => p.category === state.category);
+    products = sortListProducts(products, state.listSort);
     list.innerHTML = '';
     empty.hidden = products.length > 0;
     for (const p of products) list.append(renderProductCard(p));
@@ -996,6 +1025,11 @@ function init(): void {
   qs<HTMLSelectElement>('#replenishment-sort').addEventListener('change', (e) => {
     state.replenishmentSort = (e.target as HTMLSelectElement).value as ReplenishmentSort;
     void loadReplenishmentList();
+  });
+
+  qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
+    state.listSort = (e.target as HTMLSelectElement).value as ListSort;
+    void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
   });
 
   let searchTimer: number | undefined;
