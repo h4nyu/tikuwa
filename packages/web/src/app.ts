@@ -216,7 +216,10 @@ function showView(view: ViewName): void {
     void refreshReplenishmentCategoryChips();
     void loadReplenishmentList();
   }
-  if (view === 'delivery') void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+  if (view === 'delivery') {
+    renderDeliveryCategoryChips();
+    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+  }
   if (view === 'scan') void startScanner();
 }
 
@@ -314,6 +317,33 @@ async function refreshReplenishmentCategoryChips(): Promise<void> {
     state.replenishmentCategory = null;
   }
   renderReplenishmentCategoryChipsNow();
+}
+
+// 物流管理のカテゴリは商品カテゴリとは無関係の固定4択なので、在庫一覧のチップと見た目を
+// 揃えつつ、DELIVERY_STATUSESを直接使う専用の描画関数にする。
+function renderDeliveryCategoryChips(): void {
+  const bar = qs<HTMLDivElement>('#delivery-category-filter');
+  bar.innerHTML = '';
+
+  const selectCategory = (cat: string): void => {
+    state.deliveryCategory = state.deliveryCategory === cat ? '' : cat;
+    renderDeliveryCategoryChips();
+    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+  };
+
+  const allChip = el('button', { class: `chip${state.deliveryCategory === '' ? ' active' : ''}`, type: 'button' }, [
+    'すべて',
+  ]);
+  allChip.addEventListener('click', () => selectCategory(''));
+  bar.append(allChip);
+
+  for (const cat of DELIVERY_STATUSES) {
+    const chip = el('button', { class: `chip${state.deliveryCategory === cat ? ' active' : ''}`, type: 'button' }, [
+      cat,
+    ]);
+    chip.addEventListener('click', () => selectCategory(cat));
+    bar.append(chip);
+  }
 }
 
 // ---- Product list --------------------------------------------------------
@@ -1370,10 +1400,7 @@ function init(): void {
     const value = (e.target as HTMLInputElement).value.trim();
     deliverySearchTimer = window.setTimeout(() => void loadDeliveryList(value), 250);
   });
-  qs<HTMLSelectElement>('#delivery-category-filter').addEventListener('change', (e) => {
-    state.deliveryCategory = (e.target as HTMLSelectElement).value;
-    void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-  });
+  renderDeliveryCategoryChips();
   void fetchKnownProductNames();
   attachSuggestions(
     qs<HTMLInputElement>('#delivery-product-name'),
