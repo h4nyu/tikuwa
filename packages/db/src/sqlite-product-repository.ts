@@ -135,21 +135,31 @@ export function SqliteProductRepository(db: DatabaseSync): ProductRepository {
   };
 
   const findAll: ProductRepository['findAll'] = (query) => {
-    const q = (query ?? '').trim();
+    // カンマ(全角・半角)や改行区切りで複数キーワードを指定すると、いずれかに
+    // マッチする商品をまとめて検索できる(例: "醤油,塩,刺繍糸01")。
+    const terms = (query ?? '')
+      .split(/[,，、\n]+/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+
     let rows: ProductRow[];
-    if (!q) {
+    if (!terms.length) {
       rows = asRow<ProductRow[]>(db.prepare('SELECT * FROM products ORDER BY name COLLATE NOCASE').all());
     } else {
-      const like = `%${q}%`;
+      const whereClauses = terms.map(() => '(p.name LIKE ? OR p.category LIKE ? OR b.barcode LIKE ?)').join(' OR ');
+      const params = terms.flatMap((t) => {
+        const like = `%${t}%`;
+        return [like, like, like];
+      });
       rows = asRow<ProductRow[]>(
         db
           .prepare(
             `SELECT DISTINCT p.* FROM products p
              LEFT JOIN product_barcodes b ON b.product_id = p.id
-             WHERE p.name LIKE ? OR p.category LIKE ? OR b.barcode LIKE ?
+             WHERE ${whereClauses}
              ORDER BY p.name COLLATE NOCASE`
           )
-          .all(like, like, like)
+          .all(...params)
       );
     }
     const grouped = allBarcodesGrouped();
