@@ -73,6 +73,25 @@
         <ul id="replenishment-list" class="product-list"></ul>
         <p id="replenishment-empty" class="empty-state" hidden>補充が必要な商品はありません。</p>
       </section>
+
+      <section id="view-delivery" class="view" hidden>
+        <div class="section-header">
+          <p class="section-desc">届いた荷物の商品名と追跡番号を記録します。</p>
+          <button id="refresh-delivery" class="icon-btn" type="button" aria-label="納品記録を更新">🔄</button>
+        </div>
+        <div class="form-row" style="position: relative;">
+          <label for="delivery-product-name">商品名</label>
+          <input id="delivery-product-name" type="text" autocomplete="off" placeholder="例: 321" />
+          <div id="delivery-product-suggestions" class="suggestion-list" hidden></div>
+        </div>
+        <div class="form-row">
+          <label for="delivery-tracking-number">追跡番号</label>
+          <input id="delivery-tracking-number" type="text" autocomplete="off" placeholder="例: 1234-5678-9012" />
+        </div>
+        <button id="delivery-submit" class="btn btn-primary btn-block" type="button">記録する</button>
+        <ul id="delivery-list" class="tx-list" style="margin-top: 16px;"></ul>
+        <p id="delivery-empty" class="empty-state" hidden>まだ納品記録がありません。</p>
+      </section>
     </main>
 
     <button id="fab-add" class="fab" aria-label="商品を追加">+</button>
@@ -86,6 +105,9 @@
       </button>
       <button class="nav-btn" data-view="replenishment" data-title="補充リスト">
         <span class="nav-icon">🛒</span><span>補充</span>
+      </button>
+      <button class="nav-btn" data-view="delivery" data-title="納品記録">
+        <span class="nav-icon">📦</span><span>納品</span>
       </button>
     </nav>
 

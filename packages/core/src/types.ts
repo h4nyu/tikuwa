@@ -74,3 +74,16 @@ export interface ProductWithStatus extends Product {
   needed: number;
   lowStock: boolean;
 }
+
+/** 発注した荷物が届いた際に、商品名と追跡番号を記録するための納品記録 */
+export interface DeliveryRecord {
+  id: number;
+  productName: string;
+  trackingNumber: string;
+  createdAt: string;
+}
+
+export interface NewDeliveryRecordInput {
+  productName: string;
+  trackingNumber: string;
+}

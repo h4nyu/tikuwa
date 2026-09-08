@@ -105,6 +105,14 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 | POST | `/api/products/:id/transactions` | 入出庫記録(`type: in\|out\|adjust`) |
 | POST | `/api/products/:id/barcodes` | バーコードを追加(`quantity_per_scan`で箱・ケース等の数量を指定) |
 | DELETE | `/api/products/:id/barcodes/:barcodeId` | バーコードを削除 |
+| GET | `/api/deliveries` | 納品記録の一覧(新しい順) |
+| POST | `/api/deliveries` | 納品記録を追加(`product_name`・`tracking_number`) |
+| DELETE | `/api/deliveries/:id` | 納品記録を削除 |
+
+## 納品記録
+
+下部ナビの「納品」タブでは、発注した荷物が届いた際に商品名(候補入力あり)と追跡番号を記録できる。
+商品の在庫数とは連動しない、単純な記録用の一覧(新しい順)。
 
 ## 複数バーコード(箱・ケース対応)
 

@@ -36,7 +36,14 @@ interface TransactionDto {
   createdAt: string;
 }
 
-type ViewName = 'list' | 'scan' | 'replenishment';
+interface DeliveryDto {
+  id: number;
+  productName: string;
+  trackingNumber: string;
+  createdAt: string;
+}
+
+type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery';
 
 // 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
 const THREAD_BOX_SIZE = 12;
@@ -86,6 +93,38 @@ function showToast(message: string): void {
   }, 2200);
 }
 
+/**
+ * テキスト入力にフォーカス/入力するたびに候補一覧を出す簡易オートコンプリート。
+ * カテゴリ入力・納品記録の商品名入力など、既存の値から選ばせたい場面で使う。
+ */
+function attachSuggestions(input: HTMLInputElement, suggestionBox: HTMLDivElement, getItems: () => string[]): void {
+  function render(): void {
+    const query = input.value.trim().toLowerCase();
+    const matches = getItems().filter((item) => item.toLowerCase() !== query && (!query || item.toLowerCase().includes(query)));
+    suggestionBox.innerHTML = '';
+    if (!matches.length) {
+      suggestionBox.hidden = true;
+      return;
+    }
+    for (const item of matches) {
+      const entry = el('div', { class: 'suggestion-item' }, [item]);
+      entry.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        input.value = item;
+        suggestionBox.hidden = true;
+      });
+      suggestionBox.append(entry);
+    }
+    suggestionBox.hidden = false;
+  }
+
+  input.addEventListener('focus', render);
+  input.addEventListener('input', render);
+  input.addEventListener('blur', () => {
+    window.setTimeout(() => (suggestionBox.hidden = true), 150);
+  });
+}
+
 // ---- API ---------------------------------------------------------------
 
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
@@ -119,6 +158,10 @@ const Api = {
     api<ProductBarcodeDto>(`/api/products/${productId}/barcodes`, { method: 'POST', body: JSON.stringify(data) }),
   removeBarcode: (productId: number, barcodeId: number) =>
     api<void>(`/api/products/${productId}/barcodes/${barcodeId}`, { method: 'DELETE' }),
+  deliveries: () => api<DeliveryDto[]>('/api/deliveries'),
+  createDelivery: (data: Record<string, unknown>) =>
+    api<DeliveryDto>('/api/deliveries', { method: 'POST', body: JSON.stringify(data) }),
+  removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
 };
 
 // ---- View switching ------------------------------------------------------
@@ -162,6 +205,7 @@ function showView(view: ViewName): void {
     void refreshReplenishmentCategoryChips();
     void loadReplenishmentList();
   }
+  if (view === 'delivery') void loadDeliveryList();
   if (view === 'scan') void startScanner();
 }
 
@@ -796,34 +840,11 @@ function openProductForm(existing?: ProductDto, prefillBarcode?: string): void {
   }
 
   void fetchKnownCategories();
-  const categoryInput = qs<HTMLInputElement>('#f-category', modal);
-  const suggestionBox = qs<HTMLDivElement>('#category-suggestions', modal);
-
-  function renderCategorySuggestions(): void {
-    const query = categoryInput.value.trim().toLowerCase();
-    const matches = knownCategories.filter((c) => c.toLowerCase() !== query && (!query || c.toLowerCase().includes(query)));
-    suggestionBox.innerHTML = '';
-    if (!matches.length) {
-      suggestionBox.hidden = true;
-      return;
-    }
-    for (const cat of matches) {
-      const item = el('div', { class: 'suggestion-item' }, [cat]);
-      item.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        categoryInput.value = cat;
-        suggestionBox.hidden = true;
-      });
-      suggestionBox.append(item);
-    }
-    suggestionBox.hidden = false;
-  }
-
-  categoryInput.addEventListener('focus', renderCategorySuggestions);
-  categoryInput.addEventListener('input', renderCategorySuggestions);
-  categoryInput.addEventListener('blur', () => {
-    window.setTimeout(() => (suggestionBox.hidden = true), 150);
-  });
+  attachSuggestions(
+    qs<HTMLInputElement>('#f-category', modal),
+    qs<HTMLDivElement>('#category-suggestions', modal),
+    () => knownCategories
+  );
 
   qs<HTMLButtonElement>('#f-submit', modal).addEventListener('click', () => {
     const name = qs<HTMLInputElement>('#f-name', modal).value.trim();
@@ -1086,6 +1107,71 @@ function openManualBarcodeEntry(): void {
   });
 }
 
+// ---- Delivery records ------------------------------------------------
+
+let knownProductNames: string[] = [];
+
+async function fetchKnownProductNames(): Promise<void> {
+  try {
+    const all = await Api.list();
+    knownProductNames = all.map((p) => p.name);
+  } catch {
+    /* 取得に失敗しても既存の候補表示は維持する */
+  }
+}
+
+async function loadDeliveryList(): Promise<void> {
+  const list = qs<HTMLUListElement>('#delivery-list');
+  const empty = qs<HTMLParagraphElement>('#delivery-empty');
+  try {
+    const deliveries = await Api.deliveries();
+    list.innerHTML = '';
+    empty.hidden = deliveries.length > 0;
+    for (const d of deliveries) {
+      const li = el('li');
+      li.innerHTML = `
+        <span>${escapeHtml(d.productName)} ・ ${escapeHtml(d.trackingNumber)}</span>
+        <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-remove-delivery="${d.id}">削除</button></span>
+      `;
+      list.append(li);
+    }
+    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-remove-delivery]'))) {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.removeDelivery);
+        void (async () => {
+          try {
+            await Api.removeDelivery(id);
+            showToast('削除しました');
+            void loadDeliveryList();
+          } catch (err) {
+            showToast((err as Error).message);
+          }
+        })();
+      });
+    }
+  } catch (err) {
+    showToast((err as Error).message);
+  }
+}
+
+function submitDelivery(): void {
+  const productName = qs<HTMLInputElement>('#delivery-product-name').value.trim();
+  const trackingNumber = qs<HTMLInputElement>('#delivery-tracking-number').value.trim();
+  if (!productName) return showToast('商品名を入力してください');
+  if (!trackingNumber) return showToast('追跡番号を入力してください');
+  void (async () => {
+    try {
+      await Api.createDelivery({ product_name: productName, tracking_number: trackingNumber });
+      qs<HTMLInputElement>('#delivery-product-name').value = '';
+      qs<HTMLInputElement>('#delivery-tracking-number').value = '';
+      showToast('記録しました');
+      void loadDeliveryList();
+    } catch (err) {
+      showToast((err as Error).message);
+    }
+  })();
+}
+
 // ---- Init ------------------------------------------------------------
 
 function init(): void {
@@ -1119,6 +1205,18 @@ function init(): void {
     state.replenishmentSort = (e.target as HTMLSelectElement).value as ReplenishmentSort;
     void loadReplenishmentList();
   });
+
+  qs<HTMLButtonElement>('#refresh-delivery').addEventListener('click', (e) => {
+    spinIcon(e.currentTarget as HTMLButtonElement);
+    void loadDeliveryList();
+  });
+  qs<HTMLButtonElement>('#delivery-submit').addEventListener('click', () => submitDelivery());
+  void fetchKnownProductNames();
+  attachSuggestions(
+    qs<HTMLInputElement>('#delivery-product-name'),
+    qs<HTMLDivElement>('#delivery-product-suggestions'),
+    () => knownProductNames
+  );
 
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
     state.listSort = (e.target as HTMLSelectElement).value as ListSort;

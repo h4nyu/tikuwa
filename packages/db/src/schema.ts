@@ -49,6 +49,13 @@ export function migrate(db: DatabaseSync): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
     CREATE INDEX IF NOT EXISTS idx_transactions_product ON stock_transactions(product_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS delivery_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_name TEXT NOT NULL,
+      tracking_number TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
   `);
 }
 

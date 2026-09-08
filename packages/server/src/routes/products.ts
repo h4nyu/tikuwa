@@ -11,6 +11,7 @@ import {
   type ProductWithStatus,
   type TransactionType,
 } from '@tikuwa/core';
+import { readJson } from '../http-utils';
 
 function serialize(product: Product): ProductWithStatus {
   return {
@@ -26,14 +27,6 @@ function statusFor(err: ErrorResult): 400 | 404 | 409 {
   if (err instanceof NotFoundError) return 404;
   if (err instanceof DuplicateBarcodeError) return 409;
   return 400;
-}
-
-async function readJson(req: Request): Promise<Record<string, unknown>> {
-  try {
-    return (await req.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
 }
 
 interface RawBarcodeInput {
