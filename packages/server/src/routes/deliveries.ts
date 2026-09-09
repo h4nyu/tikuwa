@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { NotFoundError, ValidationError, type DeliveryRepository, type DeliveryStatus } from '@tikuwa/core';
 import { readJson } from '../http-utils';
 import { env } from '../env';
-import { KDNIAO_STATE_LABELS, queryKdniaoTracking, resolveShipperCode } from '../kdniao';
+import { KUAIDI100_STATE_LABELS, queryKuaidi100Tracking, requiresPhone, resolveComCode } from '../kuaidi100';
 
 export function deliveriesRoutes(repo: DeliveryRepository): Hono {
   const app = new Hono();
@@ -57,7 +57,7 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
     return c.json(result);
   });
 
-  // 記録済みの追跡番号・運送会社を使って快递鳥(kdniao.com)の物流照会APIに問い合わせ、
+  // 記録済みの追跡番号・運送会社を使って快递100(kuaidi100.com)の物流照会APIに問い合わせ、
   // 中国国内の配送が完了(署名確認)していれば上海到着に自動更新する。
   app.post('/:id/track', async (c) => {
     const id = Number(c.req.param('id'));
@@ -66,46 +66,49 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
     if (!record.carrier) {
       return c.json({ error: 'validation', message: '運送会社が入力されていません' }, 400);
     }
-    const shipperCode = resolveShipperCode(record.carrier);
-    if (!shipperCode) {
+    const comCode = resolveComCode(record.carrier);
+    if (!comCode) {
       return c.json(
         { error: 'validation', message: `運送会社「${record.carrier}」に対応する配送業者コードが見つかりません` },
         400
       );
     }
-    if (!env.kdniaoEbusinessId || !env.kdniaoAppKey) {
+    if (!env.kuaidi100Customer || !env.kuaidi100Key) {
       return c.json(
         {
           error: 'not_configured',
-          message: '快递鳥のAPIキーが設定されていません(KDNIAO_EBUSINESS_ID・KDNIAO_APP_KEY)',
+          message: '快递100のAPIキーが設定されていません(KUAIDI100_CUSTOMER・KUAIDI100_KEY)',
         },
         500
       );
     }
     try {
-      const result = await queryKdniaoTracking(
-        env.kdniaoEbusinessId,
-        env.kdniaoAppKey,
-        shipperCode,
+      const result = await queryKuaidi100Tracking(
+        env.kuaidi100Customer,
+        env.kuaidi100Key,
+        comCode,
         record.trackingNumber
       );
-      if (!result.Success) {
-        return c.json({ error: 'kdniao_error', message: result.Reason || '照会に失敗しました' }, 502);
+      if (result.message !== 'ok') {
+        const hint = requiresPhone(comCode)
+          ? '(この運送会社は照会に電話番号が必要な場合があります)'
+          : '';
+        return c.json({ error: 'kuaidi100_error', message: `${result.message || '照会に失敗しました'}${hint}` }, 502);
       }
       let delivery = record;
-      if (result.State === '3' && (record.category == null || record.category === '発注済み')) {
+      if (result.state === '3' && (record.category == null || record.category === '発注済み')) {
         const updateResult = repo.update(id, { category: '上海到着' });
         if (!(updateResult instanceof Error)) delivery = updateResult;
       }
-      const traces = result.Traces ?? [];
+      const traces = result.data ?? [];
       return c.json({
-        state: result.State ?? null,
-        stateText: KDNIAO_STATE_LABELS[result.State ?? ''] ?? '不明',
-        latestTrace: traces.length ? traces[traces.length - 1] : null,
+        state: result.state ?? null,
+        stateText: KUAIDI100_STATE_LABELS[result.state ?? ''] ?? '不明',
+        latestTrace: traces.length ? traces[0] : null,
         delivery,
       });
     } catch (err) {
-      return c.json({ error: 'kdniao_error', message: (err as Error).message }, 502);
+      return c.json({ error: 'kuaidi100_error', message: (err as Error).message }, 502);
     }
   });
 

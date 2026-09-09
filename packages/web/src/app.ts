@@ -54,7 +54,7 @@ interface DeliveryDto {
 interface DeliveryTrackResult {
   state: string | null;
   stateText: string;
-  latestTrace: { AcceptTime: string; AcceptStation: string } | null;
+  latestTrace: { time: string; context: string } | null;
   delivery: DeliveryDto;
 }
 
@@ -1245,7 +1245,7 @@ async function loadDeliveryList(query?: string): Promise<void> {
           try {
             const result = await Api.trackDelivery(id);
             const traceText = result.latestTrace
-              ? `${result.latestTrace.AcceptTime.slice(5, 16)} ${result.latestTrace.AcceptStation}`
+              ? `${result.latestTrace.time.slice(5, 16)} ${result.latestTrace.context}`
               : '';
             showToast([result.stateText, traceText].filter(Boolean).join(' / '));
             void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());

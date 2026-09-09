@@ -6,7 +6,7 @@ export const env = {
   dbPath: process.env.DB_PATH || 'data/tikuwa.db',
   certDir: process.env.CERT_DIR || 'certs',
   webPublicDir: process.env.WEB_PUBLIC_DIR || 'packages/web/dist',
-  // 快递鳥(kdniao.com)の物流照会APIキー。未設定の場合は物流管理の「照会」機能が無効になる。
-  kdniaoEbusinessId: process.env.KDNIAO_EBUSINESS_ID || '',
-  kdniaoAppKey: process.env.KDNIAO_APP_KEY || '',
+  // 快递100(kuaidi100.com)の物流照会APIキー。未設定の場合は物流管理の「照会」機能が無効になる。
+  kuaidi100Customer: process.env.KUAIDI100_CUSTOMER || '',
+  kuaidi100Key: process.env.KUAIDI100_KEY || '',
 };

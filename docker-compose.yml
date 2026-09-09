@@ -24,6 +24,6 @@ services:
     environment:
       - PORT=3000
       - HTTPS_PORT=3443
-      # 快递鳥APIキー。Pi上の.env(git管理外)に実際の値を書く。詳細は.env.exampleを参照。
-      - KDNIAO_EBUSINESS_ID=${KDNIAO_EBUSINESS_ID:-}
-      - KDNIAO_APP_KEY=${KDNIAO_APP_KEY:-}
+      # 快递100APIキー。Pi上の.env(git管理外)に実際の値を書く。詳細は.env.exampleを参照。
+      - KUAIDI100_CUSTOMER=${KUAIDI100_CUSTOMER:-}
+      - KUAIDI100_KEY=${KUAIDI100_KEY:-}
