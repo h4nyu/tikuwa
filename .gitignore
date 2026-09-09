@@ -8,3 +8,4 @@ certs/
 packages/web/dist/
 .DS_Store
 *.log
+.env

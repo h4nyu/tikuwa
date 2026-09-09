@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { NotFoundError, ValidationError, type DeliveryRepository, type DeliveryStatus } from '@tikuwa/core';
 import { readJson } from '../http-utils';
+import { env } from '../env';
+import { KDNIAO_STATE_LABELS, queryKdniaoTracking, resolveShipperCode } from '../kdniao';
 
 export function deliveriesRoutes(repo: DeliveryRepository): Hono {
   const app = new Hono();
@@ -53,6 +55,58 @@ export function deliveriesRoutes(repo: DeliveryRepository): Hono {
       return c.json({ error: result.kind, message: result.message }, 404);
     }
     return c.json(result);
+  });
+
+  // 記録済みの追跡番号・運送会社を使って快递鳥(kdniao.com)の物流照会APIに問い合わせ、
+  // 中国国内の配送が完了(署名確認)していれば上海到着に自動更新する。
+  app.post('/:id/track', async (c) => {
+    const id = Number(c.req.param('id'));
+    const record = repo.findAll().find((d) => d.id === id);
+    if (!record) return c.json({ error: 'not_found', message: '記録が見つかりません' }, 404);
+    if (!record.carrier) {
+      return c.json({ error: 'validation', message: '運送会社が入力されていません' }, 400);
+    }
+    const shipperCode = resolveShipperCode(record.carrier);
+    if (!shipperCode) {
+      return c.json(
+        { error: 'validation', message: `運送会社「${record.carrier}」に対応する配送業者コードが見つかりません` },
+        400
+      );
+    }
+    if (!env.kdniaoEbusinessId || !env.kdniaoAppKey) {
+      return c.json(
+        {
+          error: 'not_configured',
+          message: '快递鳥のAPIキーが設定されていません(KDNIAO_EBUSINESS_ID・KDNIAO_APP_KEY)',
+        },
+        500
+      );
+    }
+    try {
+      const result = await queryKdniaoTracking(
+        env.kdniaoEbusinessId,
+        env.kdniaoAppKey,
+        shipperCode,
+        record.trackingNumber
+      );
+      if (!result.Success) {
+        return c.json({ error: 'kdniao_error', message: result.Reason || '照会に失敗しました' }, 502);
+      }
+      let delivery = record;
+      if (result.State === '3' && (record.category == null || record.category === '発注済み')) {
+        const updateResult = repo.update(id, { category: '上海到着' });
+        if (!(updateResult instanceof Error)) delivery = updateResult;
+      }
+      const traces = result.Traces ?? [];
+      return c.json({
+        state: result.State ?? null,
+        stateText: KDNIAO_STATE_LABELS[result.State ?? ''] ?? '不明',
+        latestTrace: traces.length ? traces[traces.length - 1] : null,
+        delivery,
+      });
+    } catch (err) {
+      return c.json({ error: 'kdniao_error', message: (err as Error).message }, 502);
+    }
   });
 
   app.delete('/:id', (c) => {
