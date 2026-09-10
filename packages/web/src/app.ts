@@ -1465,23 +1465,59 @@ function deselectAllDeliveries(): void {
   selectedDeliveryIds.clear();
 }
 
-function applyBulkDeliveryCategory(): void {
+function openBulkDeliveryEditModal(): void {
   if (!selectedDeliveryIds.size) {
-    showToast('カテゴリを変更する記録にチェックを入れてください');
+    showToast('統一編集する記録にチェックを入れてください');
     return;
   }
-  const category = qs<HTMLSelectElement>('#delivery-bulk-category').value;
-  void (async () => {
-    try {
-      const ids = Array.from(selectedDeliveryIds);
-      await Promise.all(ids.map((id) => Api.updateDelivery(id, { category })));
-      selectedDeliveryIds.clear();
-      showToast(`${ids.length}件のカテゴリを「${category}」に変更しました`);
-      void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-    } catch (err) {
-      showToast((err as Error).message);
+  const count = selectedDeliveryIds.size;
+  const categoryOptions = DELIVERY_STATUSES.map((s) => `<option value="${s}">${s}</option>`).join('');
+  const modal = openModal(`
+    <h2>選択した${count}件を統一編集</h2>
+    <p class="scan-hint">空欄のままの項目は変更されません。</p>
+    <div class="form-row">
+      <label for="bulk-carrier">運送会社</label>
+      <input id="bulk-carrier" type="text" autocomplete="off" placeholder="変更しない" />
+    </div>
+    <div class="form-row">
+      <label for="bulk-category">カテゴリ</label>
+      <select id="bulk-category">
+        <option value="">変更しない</option>
+        ${categoryOptions}
+      </select>
+    </div>
+    <div class="form-row">
+      <label for="bulk-intl-tracking">総国際追跡番号</label>
+      <input id="bulk-intl-tracking" type="text" autocomplete="off" placeholder="変更しない" />
+    </div>
+    <button class="btn btn-primary btn-block" id="bulk-edit-apply">適用</button>
+  `);
+
+  qs<HTMLButtonElement>('#bulk-edit-apply', modal).addEventListener('click', () => {
+    const carrier = qs<HTMLInputElement>('#bulk-carrier', modal).value.trim();
+    const category = qs<HTMLSelectElement>('#bulk-category', modal).value;
+    const internationalTrackingNumber = qs<HTMLInputElement>('#bulk-intl-tracking', modal).value.trim();
+    const payload: Record<string, unknown> = {};
+    if (carrier) payload.carrier = carrier;
+    if (category) payload.category = category;
+    if (internationalTrackingNumber) payload.international_tracking_number = internationalTrackingNumber;
+    if (Object.keys(payload).length === 0) {
+      showToast('変更する項目を入力してください');
+      return;
     }
-  })();
+    void (async () => {
+      try {
+        const ids = Array.from(selectedDeliveryIds);
+        await Promise.all(ids.map((id) => Api.updateDelivery(id, payload)));
+        selectedDeliveryIds.clear();
+        closeModal();
+        showToast(`${ids.length}件を統一編集しました`);
+        void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
 }
 
 // ---- Init ------------------------------------------------------------
@@ -1528,7 +1564,7 @@ function init(): void {
   qs<HTMLButtonElement>('#export-delivery-csv').addEventListener('click', () => exportDeliveryCsv());
   qs<HTMLButtonElement>('#delivery-select-all').addEventListener('click', () => selectAllDeliveries());
   qs<HTMLButtonElement>('#delivery-delete-selected').addEventListener('click', () => deselectAllDeliveries());
-  qs<HTMLButtonElement>('#delivery-bulk-category-apply').addEventListener('click', () => applyBulkDeliveryCategory());
+  qs<HTMLButtonElement>('#delivery-bulk-edit-open').addEventListener('click', () => openBulkDeliveryEditModal());
 
   let deliverySearchTimer: number | undefined;
   qs<HTMLInputElement>('#delivery-search').addEventListener('input', (e) => {
