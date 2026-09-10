@@ -418,6 +418,30 @@ html, body {
 .delivery-item-main input[type='checkbox'] { flex: 0 0 auto; width: 18px; height: 18px; }
 .delivery-item > .category-badge { align-self: flex-start; }
 
+#delivery-list li.delivery-group { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 0; }
+.delivery-group-header { display: flex; align-items: center; gap: 8px; }
+.delivery-group-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 4px;
+  flex: 0 0 auto;
+}
+.delivery-group-title { font-weight: 700; }
+.delivery-group-count { color: var(--text-muted); font-size: 0.8rem; }
+.delivery-group-children {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 20px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.delivery-group-children li.delivery-item { padding: 6px 0; }
+
 .toast {
   position: fixed;
   left: 50%;

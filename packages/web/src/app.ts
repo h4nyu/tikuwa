@@ -1177,6 +1177,54 @@ let currentDeliveries: DeliveryDto[] = [];
 // 削除された記録のIDだけ一覧再取得時に取り除く。
 const selectedDeliveryIds = new Set<number>();
 
+function buildDeliveryItemLi(d: DeliveryDto): HTMLLIElement {
+  const li = el('li', { class: 'delivery-item' });
+  const label = [
+    d.productName,
+    d.trackingNumber,
+    d.carrier,
+    d.internationalTrackingNumber ? `総:${d.internationalTrackingNumber}` : null,
+  ]
+    .filter((part): part is string => !!part)
+    .map(escapeHtml)
+    .join(' ・ ');
+  const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
+  const checked = selectedDeliveryIds.has(d.id) ? 'checked' : '';
+  li.innerHTML = `
+    <div class="delivery-item-top">
+      <div class="delivery-item-main">
+        <input type="checkbox" class="delivery-select-checkbox" data-select-delivery="${d.id}" ${checked} />
+        <span>${label}</span>
+      </div>
+      <span>${escapeHtml(d.createdAt.slice(5, 16))} ${d.carrier ? `<button class="link-btn" data-track-delivery="${d.id}">照会</button> ` : ''}<button class="link-btn" data-edit-delivery="${d.id}">編集</button></span>
+    </div>
+    ${categoryBadge}
+  `;
+  return li;
+}
+
+function buildDeliveryGroupLi(groupKey: string, groupItems: DeliveryDto[]): HTMLLIElement {
+  const groupLi = el('li', { class: 'delivery-group' });
+  const childList = el(
+    'ul',
+    { class: 'delivery-group-children' },
+    groupItems.map((gi) => buildDeliveryItemLi(gi))
+  );
+  const toggleBtn = el('button', { class: 'delivery-group-toggle', type: 'button' }, ['▼']);
+  toggleBtn.addEventListener('click', () => {
+    const willCollapse = !childList.hidden;
+    childList.hidden = willCollapse;
+    toggleBtn.textContent = willCollapse ? '▶' : '▼';
+  });
+  const header = el('div', { class: 'delivery-group-header' }, [
+    toggleBtn,
+    el('span', { class: 'delivery-group-title' }, [`総追跡番号: ${groupKey}`]),
+    el('span', { class: 'delivery-group-count' }, [`${groupItems.length}件`]),
+  ]);
+  groupLi.append(header, childList);
+  return groupLi;
+}
+
 async function loadDeliveryList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#delivery-list');
   const empty = qs<HTMLParagraphElement>('#delivery-empty');
@@ -1204,30 +1252,20 @@ async function loadDeliveryList(query?: string): Promise<void> {
     list.innerHTML = '';
     empty.hidden = deliveries.length > 0;
     empty.textContent = q || state.deliveryCategory ? '該当する記録がありません。' : 'まだ記録がありません。';
+    const rendered = new Set<number>();
     for (const d of deliveries) {
-      const li = el('li', { class: 'delivery-item' });
-      const label = [
-        d.productName,
-        d.trackingNumber,
-        d.carrier,
-        d.internationalTrackingNumber ? `総:${d.internationalTrackingNumber}` : null,
-      ]
-        .filter((part): part is string => !!part)
-        .map(escapeHtml)
-        .join(' ・ ');
-      const categoryBadge = d.category ? `<span class="category-badge">${escapeHtml(d.category)}</span>` : '';
-      const checked = selectedDeliveryIds.has(d.id) ? 'checked' : '';
-      li.innerHTML = `
-        <div class="delivery-item-top">
-          <div class="delivery-item-main">
-            <input type="checkbox" class="delivery-select-checkbox" data-select-delivery="${d.id}" ${checked} />
-            <span>${label}</span>
-          </div>
-          <span>${escapeHtml(d.createdAt.slice(5, 16))} ${d.carrier ? `<button class="link-btn" data-track-delivery="${d.id}">照会</button> ` : ''}<button class="link-btn" data-edit-delivery="${d.id}">編集</button></span>
-        </div>
-        ${categoryBadge}
-      `;
-      list.append(li);
+      if (rendered.has(d.id)) continue;
+      if (d.category === '国際発送' && d.internationalTrackingNumber) {
+        const groupKey = d.internationalTrackingNumber;
+        const groupItems = deliveries.filter(
+          (x) => x.category === '国際発送' && x.internationalTrackingNumber === groupKey
+        );
+        for (const gi of groupItems) rendered.add(gi.id);
+        list.append(buildDeliveryGroupLi(groupKey, groupItems));
+      } else {
+        rendered.add(d.id);
+        list.append(buildDeliveryItemLi(d));
+      }
     }
     for (const checkbox of Array.from(list.querySelectorAll<HTMLInputElement>('[data-select-delivery]'))) {
       checkbox.addEventListener('change', () => {
