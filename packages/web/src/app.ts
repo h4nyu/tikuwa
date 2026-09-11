@@ -1183,7 +1183,7 @@ function buildDeliveryItemLi(d: DeliveryDto): HTMLLIElement {
     d.productName,
     d.trackingNumber,
     d.carrier,
-    d.internationalTrackingNumber ? `総:${d.internationalTrackingNumber}` : null,
+    d.internationalTrackingNumber ? `国際:${d.internationalTrackingNumber}` : null,
   ]
     .filter((part): part is string => !!part)
     .map(escapeHtml)
@@ -1218,7 +1218,7 @@ function buildDeliveryGroupLi(groupKey: string, groupItems: DeliveryDto[]): HTML
   });
   const header = el('div', { class: 'delivery-group-header' }, [
     toggleBtn,
-    el('span', { class: 'delivery-group-title' }, [`総追跡番号: ${groupKey}`]),
+    el('span', { class: 'delivery-group-title' }, [`国際追跡番号: ${groupKey}`]),
     el('span', { class: 'delivery-group-count' }, [`${groupItems.length}件`]),
   ]);
   groupLi.append(header, childList);
@@ -1335,7 +1335,7 @@ function openDeliveryForm(existing?: DeliveryDto): void {
       </select>
     </div>
     <div class="form-row">
-      <label for="d-intl-tracking">総国際追跡番号</label>
+      <label for="d-intl-tracking">国際追跡番号</label>
       <input id="d-intl-tracking" type="text" autocomplete="off" placeholder="例: INTL-1234567890(任意)" value="${escapeHtml(existing?.internationalTrackingNumber ?? '')}" />
     </div>
     ${
@@ -1415,7 +1415,7 @@ function exportDeliveryCsv(): void {
         showToast('書き出す記録にチェックを入れてください');
         return;
       }
-      const header = ['商品名', '追跡番号', '運送会社', 'カテゴリ', '総国際追跡番号', '記録日時'];
+      const header = ['商品名', '追跡番号', '運送会社', 'カテゴリ', '国際追跡番号', '記録日時'];
       const rows = target.map((d) => [
         d.productName,
         d.trackingNumber,
@@ -1487,7 +1487,7 @@ function openBulkDeliveryEditModal(): void {
       </select>
     </div>
     <div class="form-row">
-      <label for="bulk-intl-tracking">総国際追跡番号</label>
+      <label for="bulk-intl-tracking">国際追跡番号</label>
       <input id="bulk-intl-tracking" type="text" autocomplete="off" placeholder="変更しない" />
     </div>
     <button class="btn btn-primary btn-block" id="bulk-edit-apply">適用</button>

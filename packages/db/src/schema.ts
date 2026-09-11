@@ -67,7 +67,7 @@ export function migrate(db: DatabaseSync): void {
 
 /**
  * 既存のdelivery_recordsテーブルに新しい列が無ければ追加する
- * (状態ボタン・運送会社・カテゴリ・総国際追跡番号の追加分)。
+ * (状態ボタン・運送会社・カテゴリ・国際追跡番号の追加分)。
  */
 function migrateDeliveryColumns(db: DatabaseSync): void {
   const deliveryTableExists = !!db
