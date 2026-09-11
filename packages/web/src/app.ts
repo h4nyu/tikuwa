@@ -1068,8 +1068,8 @@ function scanBarcodeInto(targetInput: HTMLInputElement): void {
         verbose: false,
       });
       await tempScanner.start(
-        SCAN_VIDEO_CONSTRAINTS,
-        { fps: 15, qrbox: { width: 300, height: 140 } },
+        { facingMode: 'environment' },
+        { fps: 15, qrbox: { width: 300, height: 140 }, videoConstraints: SCAN_VIDEO_CONSTRAINTS },
         (decodedText) => {
           targetInput.value = decodedText;
           targetInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1099,8 +1099,8 @@ async function startScanner(): Promise<void> {
       verbose: false,
     });
     await scanner.start(
-      SCAN_VIDEO_CONSTRAINTS,
-      { fps: 15, qrbox: { width: 300, height: 140 } },
+      { facingMode: 'environment' },
+      { fps: 15, qrbox: { width: 300, height: 140 }, videoConstraints: SCAN_VIDEO_CONSTRAINTS },
       (decodedText) => void onScanSuccess(decodedText),
       undefined
     );
