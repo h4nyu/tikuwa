@@ -1210,24 +1210,17 @@ function buildDeliveryGroupLi(groupKey: string, groupItems: DeliveryDto[]): HTML
     { class: 'delivery-group-children' },
     groupItems.map((gi) => buildDeliveryItemLi(gi))
   );
-  const toggleBtn = el('span', { class: 'delivery-group-toggle' }, ['▼']);
-  const header = el('div', { class: 'delivery-group-header', role: 'button', tabindex: '0' }, [
+  const toggleBtn = el('button', { class: 'delivery-group-toggle', type: 'button' }, ['▼']);
+  toggleBtn.addEventListener('click', () => {
+    const willCollapse = !childList.hidden;
+    childList.hidden = willCollapse;
+    toggleBtn.textContent = willCollapse ? '▶' : '▼';
+  });
+  const header = el('div', { class: 'delivery-group-header' }, [
     toggleBtn,
     el('span', { class: 'delivery-group-title' }, [`国際追跡番号: ${groupKey}`]),
     el('span', { class: 'delivery-group-count' }, [`${groupItems.length}件`]),
   ]);
-  const toggleGroup = () => {
-    const willCollapse = !childList.hidden;
-    childList.hidden = willCollapse;
-    toggleBtn.textContent = willCollapse ? '▶' : '▼';
-  };
-  header.addEventListener('click', toggleGroup);
-  header.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggleGroup();
-    }
-  });
   groupLi.append(header, childList);
   return groupLi;
 }
