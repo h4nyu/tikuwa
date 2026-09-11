@@ -443,6 +443,7 @@ html, body {
   flex-direction: column;
   gap: 6px;
 }
+.delivery-group-children[hidden] { display: none; }
 .delivery-group-children li.delivery-item { padding: 6px 0; }
 
 .toast {
