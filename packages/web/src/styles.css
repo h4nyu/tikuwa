@@ -419,7 +419,15 @@ html, body {
 .delivery-item > .category-badge { align-self: flex-start; }
 
 #delivery-list li.delivery-group { flex-direction: column; align-items: stretch; gap: 6px; padding: 10px 0; }
-.delivery-group-header { display: flex; align-items: center; gap: 8px; }
+.delivery-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 4px 0;
+  border-radius: 8px;
+}
+.delivery-group-header:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .delivery-group-toggle {
   background: none;
   border: none;
@@ -428,6 +436,7 @@ html, body {
   color: var(--text-muted);
   padding: 4px;
   flex: 0 0 auto;
+  pointer-events: none;
 }
 .delivery-group-title { font-weight: 700; }
 .delivery-group-count { color: var(--text-muted); font-size: 0.8rem; }
