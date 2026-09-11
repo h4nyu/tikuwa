@@ -1,4 +1,4 @@
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import './styles.css';
 
 interface ProductBarcodeDto {
@@ -1008,6 +1008,25 @@ function openAttachBarcodeQuantityStep(code: string, product: ProductDto): void 
 let scanner: Html5Qrcode | null = null;
 let scannerBusy = false;
 
+// 商品バーコードは1次元コード(JAN/EAN-13・UPC-Aなど)のみのため、対応フォーマットを
+// 絞ることでフレームごとのデコード処理を軽くし、反応速度と誤読を改善する。
+const BARCODE_FORMATS = [
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.ITF,
+  Html5QrcodeSupportedFormats.CODABAR,
+];
+// 低解像度だと細いバーが潰れて誤読しやすいため、カメラ解像度を明示的に上げる。
+const SCAN_VIDEO_CONSTRAINTS: MediaTrackConstraints = {
+  facingMode: 'environment',
+  width: { ideal: 1920 },
+  height: { ideal: 1080 },
+};
+
 /**
  * フォーム内のバーコード入力欄に、カメラで読み取った値をその場で入力するための
  * 使い切りスキャナー。スキャンタブの常駐スキャナーとは別インスタンスとして
@@ -1043,10 +1062,14 @@ function scanBarcodeInto(targetInput: HTMLInputElement): void {
 
   void (async () => {
     try {
-      tempScanner = new Html5Qrcode('inline-scan-reader', { useBarCodeDetectorIfSupported: false, verbose: false });
+      tempScanner = new Html5Qrcode('inline-scan-reader', {
+        useBarCodeDetectorIfSupported: false,
+        formatsToSupport: BARCODE_FORMATS,
+        verbose: false,
+      });
       await tempScanner.start(
-        { facingMode: 'environment' },
-        { fps: 10, qrbox: { width: 260, height: 160 } },
+        SCAN_VIDEO_CONSTRAINTS,
+        { fps: 15, qrbox: { width: 300, height: 140 } },
         (decodedText) => {
           targetInput.value = decodedText;
           targetInput.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1070,10 +1093,14 @@ async function startScanner(): Promise<void> {
   try {
     // Android Chrome等のネイティブBarcodeDetectorはOS/端末依存で無反応になることがあるため、
     // 実績のあるZXingベースのJSデコーダーに固定する。
-    scanner = new Html5Qrcode('scan-reader', { useBarCodeDetectorIfSupported: false, verbose: false });
+    scanner = new Html5Qrcode('scan-reader', {
+      useBarCodeDetectorIfSupported: false,
+      formatsToSupport: BARCODE_FORMATS,
+      verbose: false,
+    });
     await scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: { width: 280, height: 180 } },
+      SCAN_VIDEO_CONSTRAINTS,
+      { fps: 15, qrbox: { width: 300, height: 140 } },
       (decodedText) => void onScanSuccess(decodedText),
       undefined
     );
