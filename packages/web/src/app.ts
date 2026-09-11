@@ -1401,8 +1401,6 @@ function openDeliveryForm(existing?: DeliveryDto): void {
 
 function exportDeliveryCsv(): void {
   // CSV書き出しはチェックボックスで選択した記録のみを対象にする。
-  // 選択した記録のうち上海到着のものは、国内転送が済んで国際発送に上がったとみなし、
-  // 書き出しと同時にカテゴリを自動更新する(次回の書き出しで同じ記録を選び直さずに済むように)。
   void (async () => {
     try {
       if (!selectedDeliveryIds.size) {
@@ -1436,14 +1434,8 @@ function exportDeliveryCsv(): void {
       a.remove();
       URL.revokeObjectURL(url);
 
-      const toPromote = target.filter((d) => d.category === '上海到着');
-      await Promise.all(toPromote.map((d) => Api.updateDelivery(d.id, { category: '国際発送' })));
       selectedDeliveryIds.clear();
-      showToast(
-        toPromote.length
-          ? `書き出した${target.length}件のうち${toPromote.length}件を国際発送に更新しました`
-          : `${target.length}件を書き出しました`
-      );
+      showToast(`${target.length}件を書き出しました`);
       void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
     } catch (err) {
       showToast((err as Error).message);
