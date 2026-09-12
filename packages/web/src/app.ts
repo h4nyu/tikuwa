@@ -449,6 +449,135 @@ function sortListProducts(products: ProductDto[], sort: ListSort): ProductDto[] 
   return sorted;
 }
 
+// ---- テキストでの出庫指示 --------------------------------------------------
+
+const TEXT_OUT_DRAFT_KEY = 'tikuwa-text-out-draft';
+
+function saveTextOutDraft(value: string): void {
+  try {
+    if (value) localStorage.setItem(TEXT_OUT_DRAFT_KEY, value);
+    else localStorage.removeItem(TEXT_OUT_DRAFT_KEY);
+  } catch {
+    /* localStorageが使えない環境では無視する */
+  }
+}
+
+function loadTextOutDraft(): string {
+  try {
+    return localStorage.getItem(TEXT_OUT_DRAFT_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function parseTextOutLine(line: string): { name: string; quantity: number } | null {
+  const m = line.trim().match(/^(.+?)\s*[xX×]\s*(\d+)\s*$/);
+  if (!m) return null;
+  const name = m[1].trim();
+  const quantity = Number(m[2]);
+  if (!name || !Number.isFinite(quantity) || quantity <= 0) return null;
+  return { name, quantity };
+}
+
+function submitTextOut(): void {
+  const textarea = qs<HTMLTextAreaElement>('#text-out-input');
+  const lines = textarea.value
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (!lines.length) {
+    showToast('出庫内容を「商品名x数量」の形式で入力してください');
+    return;
+  }
+
+  void (async () => {
+    try {
+      const allProducts = await Api.list();
+      const byName = new Map<string, ProductDto>();
+      for (const p of allProducts) {
+        const key = p.name.toLowerCase();
+        if (!byName.has(key)) byName.set(key, p);
+      }
+
+      const invalidFormat: string[] = [];
+      const notFound: string[] = [];
+      const toProcess: { product: ProductDto; quantity: number }[] = [];
+      for (const line of lines) {
+        const parsed = parseTextOutLine(line);
+        if (!parsed) {
+          invalidFormat.push(line);
+          continue;
+        }
+        const product = byName.get(parsed.name.toLowerCase());
+        if (!product) {
+          notFound.push(parsed.name);
+          continue;
+        }
+        toProcess.push({ product, quantity: parsed.quantity });
+      }
+
+      openTextOutConfirmModal(toProcess, invalidFormat, notFound);
+    } catch (err) {
+      showToast((err as Error).message);
+    }
+  })();
+}
+
+function openTextOutConfirmModal(
+  toProcess: { product: ProductDto; quantity: number }[],
+  invalidFormat: string[],
+  notFound: string[]
+): void {
+  const okRows = toProcess
+    .map(
+      ({ product, quantity }) => `
+    <li>
+      <span>${escapeHtml(product.name)}</span>
+      <span>${product.currentStock} → ${Math.max(0, product.currentStock - quantity)} ${escapeHtml(product.unit)}(-${quantity})</span>
+    </li>`
+    )
+    .join('');
+  const errorRows = [
+    ...notFound.map((name) => `<li style="color:var(--danger)">商品が見つかりません: ${escapeHtml(name)}</li>`),
+    ...invalidFormat.map((line) => `<li style="color:var(--danger)">形式エラー: ${escapeHtml(line)}</li>`),
+  ].join('');
+
+  const modal = openModal(`
+    <h2>テキストでの出庫を確認</h2>
+    ${toProcess.length ? `<ul class="tx-list">${okRows}</ul>` : '<p class="empty-state">出庫できる行がありません。</p>'}
+    ${errorRows ? `<div class="section-desc">対象外の行</div><ul class="tx-list">${errorRows}</ul>` : ''}
+    <div class="btn-row" style="margin-top:12px;">
+      <button class="btn btn-secondary" id="text-out-cancel">キャンセル</button>
+      <button class="btn btn-primary" id="text-out-confirm" ${toProcess.length ? '' : 'disabled'}>
+        ${toProcess.length}件を出庫する
+      </button>
+    </div>
+  `);
+
+  qs<HTMLButtonElement>('#text-out-cancel', modal).addEventListener('click', () => closeModal());
+  qs<HTMLButtonElement>('#text-out-confirm', modal).addEventListener('click', () => {
+    void (async () => {
+      try {
+        await Promise.all(
+          toProcess.map(({ product, quantity }) =>
+            Api.addTransaction(product.id, { type: 'out', quantity, note: 'テキストで出庫' })
+          )
+        );
+        closeModal();
+        showToast(`${toProcess.length}件出庫しました`);
+        if (!notFound.length && !invalidFormat.length) {
+          const textarea = qs<HTMLTextAreaElement>('#text-out-input');
+          textarea.value = '';
+          saveTextOutDraft('');
+        }
+        void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
+}
+
 async function loadProductList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#product-list');
   const empty = qs<HTMLParagraphElement>('#list-empty');
@@ -1604,6 +1733,11 @@ function init(): void {
     const value = (e.target as HTMLInputElement).value.trim();
     searchTimer = window.setTimeout(() => void loadProductList(value), 250);
   });
+
+  const textOutInput = qs<HTMLTextAreaElement>('#text-out-input');
+  textOutInput.value = loadTextOutDraft();
+  textOutInput.addEventListener('input', () => saveTextOutDraft(textOutInput.value));
+  qs<HTMLButtonElement>('#text-out-submit').addEventListener('click', () => submitTextOut());
 
   void refreshListCategoryChips();
   void loadProductList();

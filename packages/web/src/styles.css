@@ -102,6 +102,18 @@ html, body {
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .section-header .section-desc { margin: 4px 0; }
 
+.text-out-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.text-out-input {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+  resize: vertical;
+  font-family: inherit;
+}
+
 .sort-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .sort-label { flex: 0 0 auto; font-size: 0.82rem; color: var(--text-muted); }
 .sort-row select {
