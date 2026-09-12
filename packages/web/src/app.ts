@@ -1670,6 +1670,17 @@ function openBulkDeliveryEditModal(): void {
 
 // ---- Init ------------------------------------------------------------
 
+// 一部のブラウザ(楽天ブラウザ等)はsvh/dvhの計算に自前のツールバー分の高さを
+// 正しく反映せず、フッターが画面外に隠れることがある。window.innerHeightを
+// 直接測ってCSS変数に反映することで、どのブラウザでも確実に画面高に収める。
+function updateAppHeightVar(): void {
+  document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`);
+}
+updateAppHeightVar();
+window.addEventListener('resize', updateAppHeightVar);
+window.addEventListener('orientationchange', updateAppHeightVar);
+window.visualViewport?.addEventListener('resize', updateAppHeightVar);
+
 function init(): void {
   for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('.nav-btn'))) {
     btn.addEventListener('click', () => showView(btn.dataset.view as ViewName));

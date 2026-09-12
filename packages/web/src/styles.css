@@ -46,12 +46,13 @@ html, body {
 #app {
   display: flex;
   flex-direction: column;
-  /* dvhはブラウザのツールバー表示/非表示のタイミングで再計算が遅れ、
-     フッターが一時的に画面外に出る端末があるため、常に画面内に収まる
-     svh(最小ビューポート高)を使う。svh未対応の古いブラウザ向けにvhを
-     フォールバックとして先に指定する。 */
+  /* svh/dvhは一部のブラウザ(楽天ブラウザ等)で自前のツールバー分の高さが
+     正しく反映されず、フッターが画面外に隠れることがあるため、
+     window.innerHeightを直接測ったJS側の値(--app-height)を最優先で使う。
+     JS実行前やvar未対応環境向けにvh→svhの順でフォールバックする。 */
   height: 100vh;
   height: 100svh;
+  height: var(--app-height, 100svh);
 }
 
 .topbar {
