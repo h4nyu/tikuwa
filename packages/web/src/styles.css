@@ -46,7 +46,12 @@ html, body {
 #app {
   display: flex;
   flex-direction: column;
-  height: 100dvh;
+  /* dvhはブラウザのツールバー表示/非表示のタイミングで再計算が遅れ、
+     フッターが一時的に画面外に出る端末があるため、常に画面内に収まる
+     svh(最小ビューポート高)を使う。svh未対応の古いブラウザ向けにvhを
+     フォールバックとして先に指定する。 */
+  height: 100vh;
+  height: 100svh;
 }
 
 .topbar {
@@ -59,6 +64,7 @@ html, body {
 
 #view-root {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   padding: 12px 12px calc(var(--nav-height) + 24px);
   -webkit-overflow-scrolling: touch;
