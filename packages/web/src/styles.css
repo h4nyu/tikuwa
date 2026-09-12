@@ -109,7 +109,6 @@ html, body {
 .section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .section-header .section-desc { margin: 4px 0; }
 
-.text-out-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
 .text-out-input {
   padding: 10px 12px;
   border-radius: 12px;
@@ -267,6 +266,15 @@ html, body {
   cursor: pointer;
   z-index: 20;
 }
+.fab-secondary {
+  right: 86px;
+  width: auto;
+  padding: 0 18px;
+  border-radius: 28px;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+.fab-secondary[hidden] { display: none; }
 
 .bottom-nav {
   flex: 0 0 auto;

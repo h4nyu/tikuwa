@@ -217,6 +217,7 @@ function showView(view: ViewName): void {
   }
 
   qs<HTMLButtonElement>('#fab-add').setAttribute('aria-label', view === 'delivery' ? '記録を追加' : '商品を追加');
+  qs<HTMLButtonElement>('#fab-text-out').hidden = view !== 'list';
 
   if (previous === 'scan' && view !== 'scan') void stopScanner();
   if (view === 'list') {
@@ -479,6 +480,22 @@ function parseTextOutLine(line: string): { name: string; quantity: number } | nu
   return { name, quantity };
 }
 
+function openTextOutModal(): void {
+  const modal = openModal(`
+    <h2>テキストで出庫</h2>
+    <div class="form-row">
+      <label for="text-out-input">出庫内容(1行1件、商品名x数量)</label>
+      <textarea id="text-out-input" class="text-out-input" rows="6" placeholder="例:&#10;W205x3&#10;W209x1"></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" id="text-out-submit">確認する</button>
+  `);
+  const textarea = qs<HTMLTextAreaElement>('#text-out-input', modal);
+  textarea.value = loadTextOutDraft();
+  textarea.focus();
+  textarea.addEventListener('input', () => saveTextOutDraft(textarea.value));
+  qs<HTMLButtonElement>('#text-out-submit', modal).addEventListener('click', () => submitTextOut());
+}
+
 function submitTextOut(): void {
   const textarea = qs<HTMLTextAreaElement>('#text-out-input');
   const lines = textarea.value
@@ -565,11 +582,7 @@ function openTextOutConfirmModal(
         );
         closeModal();
         showToast(`${toProcess.length}件出庫しました`);
-        if (!notFound.length && !invalidFormat.length) {
-          const textarea = qs<HTMLTextAreaElement>('#text-out-input');
-          textarea.value = '';
-          saveTextOutDraft('');
-        }
+        if (!notFound.length && !invalidFormat.length) saveTextOutDraft('');
         void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());
       } catch (err) {
         showToast((err as Error).message);
@@ -1745,10 +1758,7 @@ function init(): void {
     searchTimer = window.setTimeout(() => void loadProductList(value), 250);
   });
 
-  const textOutInput = qs<HTMLTextAreaElement>('#text-out-input');
-  textOutInput.value = loadTextOutDraft();
-  textOutInput.addEventListener('input', () => saveTextOutDraft(textOutInput.value));
-  qs<HTMLButtonElement>('#text-out-submit').addEventListener('click', () => submitTextOut());
+  qs<HTMLButtonElement>('#fab-text-out').addEventListener('click', () => openTextOutModal());
 
   void refreshListCategoryChips();
   void loadProductList();

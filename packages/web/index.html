@@ -28,15 +28,6 @@
           />
           <button id="refresh-list" class="icon-btn" type="button" aria-label="一覧を更新">🔄</button>
         </div>
-        <div class="text-out-row">
-          <textarea
-            id="text-out-input"
-            class="text-out-input"
-            rows="2"
-            placeholder="テキストで出庫(例: W205x3 のように商品名x数量を1行ずつ)"
-          ></textarea>
-          <button id="text-out-submit" class="btn btn-secondary btn-block" type="button">テキストで出庫</button>
-        </div>
         <div class="sort-row">
           <label for="list-sort" class="sort-label">並び順</label>
           <select id="list-sort">
@@ -108,6 +99,7 @@
     </main>
 
     <button id="fab-add" class="fab" aria-label="商品を追加">+</button>
+    <button id="fab-text-out" class="fab fab-secondary" aria-label="テキストで出庫">出庫</button>
 
     <nav class="bottom-nav">
       <button class="nav-btn active" data-view="list" data-title="在庫一覧">
