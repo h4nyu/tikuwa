@@ -58,7 +58,22 @@ interface DeliveryTrackResult {
   delivery: DeliveryDto;
 }
 
-type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery';
+const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', 'その他'] as const;
+type SalePlatform = (typeof SALE_PLATFORMS)[number];
+
+interface SaleDto {
+  id: number;
+  platform: SalePlatform;
+  productName: string;
+  saleDate: string;
+  saleAmount: number;
+  fee: number;
+  shippingCost: number;
+  memo: string | null;
+  createdAt: string;
+}
+
+type ViewName = 'list' | 'scan' | 'replenishment' | 'delivery' | 'sales';
 
 // 刺繍糸などを12本入り箱で仕入れる前提の補充数量計算に使う。
 const THREAD_BOX_SIZE = 12;
@@ -180,6 +195,12 @@ const Api = {
     api<DeliveryDto>(`/api/deliveries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
   trackDelivery: (id: number) => api<DeliveryTrackResult>(`/api/deliveries/${id}/track`, { method: 'POST' }),
+  sales: () => api<SaleDto[]>('/api/sales'),
+  createSale: (data: Record<string, unknown>) =>
+    api<SaleDto>('/api/sales', { method: 'POST', body: JSON.stringify(data) }),
+  updateSale: (id: number, data: Record<string, unknown>) =>
+    api<SaleDto>(`/api/sales/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  removeSale: (id: number) => api<void>(`/api/sales/${id}`, { method: 'DELETE' }),
 };
 
 // ---- View switching ------------------------------------------------------
@@ -194,6 +215,7 @@ const state: {
   replenishmentSort: ReplenishmentSort;
   listSort: ListSort;
   deliveryCategory: string;
+  salePlatform: string;
 } = {
   view: 'list',
   category: null,
@@ -201,6 +223,7 @@ const state: {
   replenishmentSort: 'needed-desc',
   listSort: 'name',
   deliveryCategory: '',
+  salePlatform: '',
 };
 let knownCategories: string[] = [];
 
@@ -216,7 +239,10 @@ function showView(view: ViewName): void {
     if (btn.dataset.view === view) qs('#page-title').textContent = btn.dataset.title || '';
   }
 
-  qs<HTMLButtonElement>('#fab-add').setAttribute('aria-label', view === 'delivery' ? '記録を追加' : '商品を追加');
+  qs<HTMLButtonElement>('#fab-add').setAttribute(
+    'aria-label',
+    view === 'delivery' ? '記録を追加' : view === 'sales' ? '売上を追加' : '商品を追加'
+  );
   qs<HTMLButtonElement>('#fab-text-out').hidden = view !== 'list';
 
   if (previous === 'scan' && view !== 'scan') void stopScanner();
@@ -231,6 +257,10 @@ function showView(view: ViewName): void {
   if (view === 'delivery') {
     renderDeliveryCategoryChips();
     void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
+  }
+  if (view === 'sales') {
+    renderSalePlatformChips();
+    void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
   }
   if (view === 'scan') void startScanner();
 }
@@ -1681,6 +1711,194 @@ function openBulkDeliveryEditModal(): void {
   });
 }
 
+// ---- Sale records (確定申告向け記帳データの元) ------------------------------
+
+let currentSales: SaleDto[] = [];
+
+function renderSalePlatformChips(): void {
+  const bar = qs<HTMLDivElement>('#sales-platform-filter');
+  bar.innerHTML = '';
+
+  const selectPlatform = (platform: string): void => {
+    state.salePlatform = state.salePlatform === platform ? '' : platform;
+    renderSalePlatformChips();
+    void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
+  };
+
+  const allChip = el('button', { class: `chip${state.salePlatform === '' ? ' active' : ''}`, type: 'button' }, [
+    'すべて',
+  ]);
+  allChip.addEventListener('click', () => selectPlatform(''));
+  bar.append(allChip);
+
+  for (const platform of SALE_PLATFORMS) {
+    const chip = el(
+      'button',
+      { class: `chip${state.salePlatform === platform ? ' active' : ''}`, type: 'button' },
+      [platform]
+    );
+    chip.addEventListener('click', () => selectPlatform(platform));
+    bar.append(chip);
+  }
+}
+
+function saleNetAmount(s: SaleDto): number {
+  return s.saleAmount - s.fee - s.shippingCost;
+}
+
+async function loadSaleList(query?: string): Promise<void> {
+  const list = qs<HTMLUListElement>('#sales-list');
+  const empty = qs<HTMLParagraphElement>('#sales-empty');
+  try {
+    let sales = await Api.sales();
+    const q = (query ?? '').trim().toLowerCase();
+    if (q) {
+      sales = sales.filter(
+        (s) => s.productName.toLowerCase().includes(q) || s.platform.toLowerCase().includes(q) || (s.memo ?? '').toLowerCase().includes(q)
+      );
+    }
+    if (state.salePlatform) sales = sales.filter((s) => s.platform === state.salePlatform);
+    currentSales = sales;
+    list.innerHTML = '';
+    empty.hidden = sales.length > 0;
+    empty.textContent = q || state.salePlatform ? '該当する記録がありません。' : 'まだ売上記録がありません。';
+
+    let total = 0;
+    for (const s of sales) {
+      total += saleNetAmount(s);
+      const li = el('li', { class: 'delivery-item' });
+      const label = [s.productName, `¥${s.saleAmount.toLocaleString()}`, `手数料¥${s.fee.toLocaleString()}`, `送料¥${s.shippingCost.toLocaleString()}`, s.memo]
+        .filter((part): part is string => !!part)
+        .map(escapeHtml)
+        .join(' ・ ');
+      li.innerHTML = `
+        <div class="delivery-item-top">
+          <div class="delivery-item-main">
+            <span>${label}</span>
+          </div>
+          <span>${escapeHtml(s.saleDate)} <button class="link-btn" data-edit-sale="${s.id}">編集</button></span>
+        </div>
+        <span class="category-badge">${escapeHtml(s.platform)}</span>
+        <span style="font-weight:700;">入金見込 ¥${saleNetAmount(s).toLocaleString()}</span>
+      `;
+      list.append(li);
+    }
+    qs<HTMLParagraphElement>('#sales-total').textContent = sales.length
+      ? `表示中 ${sales.length}件・入金見込合計 ¥${total.toLocaleString()}`
+      : '';
+
+    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-edit-sale]'))) {
+      btn.addEventListener('click', () => {
+        const id = Number(btn.dataset.editSale);
+        const sale = currentSales.find((s) => s.id === id);
+        if (sale) openSaleForm(sale);
+      });
+    }
+  } catch (err) {
+    showToast((err as Error).message);
+  }
+}
+
+function todayIsoDate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function openSaleForm(existing?: SaleDto): void {
+  const isEdit = !!existing;
+  const platformOptions = SALE_PLATFORMS.map(
+    (p) => `<option value="${p}" ${existing?.platform === p ? 'selected' : ''}>${p}</option>`
+  ).join('');
+  const modal = openModal(`
+    <h2>${isEdit ? '売上記録を編集' : '売上記録を登録'}</h2>
+    <div class="form-row">
+      <label for="s-platform">プラットフォーム</label>
+      <select id="s-platform">${platformOptions}</select>
+    </div>
+    <div class="form-row">
+      <label for="s-product-name">商品名</label>
+      <input id="s-product-name" type="text" autocomplete="off" value="${escapeHtml(existing?.productName ?? '')}" />
+    </div>
+    <div class="form-row">
+      <label for="s-date">売却日</label>
+      <input id="s-date" type="date" value="${existing?.saleDate ?? todayIsoDate()}" />
+    </div>
+    <div class="form-row">
+      <label for="s-amount">販売価格(税込)</label>
+      <input id="s-amount" type="number" inputmode="numeric" min="0" value="${existing?.saleAmount ?? ''}" />
+    </div>
+    <div class="form-row">
+      <label for="s-fee">販売手数料</label>
+      <input id="s-fee" type="number" inputmode="numeric" min="0" value="${existing?.fee ?? 0}" />
+    </div>
+    <div class="form-row">
+      <label for="s-shipping">送料(出品者負担分)</label>
+      <input id="s-shipping" type="number" inputmode="numeric" min="0" value="${existing?.shippingCost ?? 0}" />
+    </div>
+    <div class="form-row">
+      <label for="s-memo">メモ(任意)</label>
+      <input id="s-memo" type="text" value="${escapeHtml(existing?.memo ?? '')}" />
+    </div>
+    ${
+      isEdit
+        ? `<div class="btn-row">
+            <button class="btn btn-primary" id="s-submit">更新</button>
+            <button class="btn btn-danger" id="s-delete">削除</button>
+          </div>`
+        : '<button class="btn btn-primary btn-block" id="s-submit">登録</button>'
+    }
+  `);
+
+  qs<HTMLButtonElement>('#s-submit', modal).addEventListener('click', () => {
+    const platform = qs<HTMLSelectElement>('#s-platform', modal).value as SalePlatform;
+    const productName = qs<HTMLInputElement>('#s-product-name', modal).value.trim();
+    const saleDate = qs<HTMLInputElement>('#s-date', modal).value;
+    const saleAmount = Number(qs<HTMLInputElement>('#s-amount', modal).value);
+    const fee = Number(qs<HTMLInputElement>('#s-fee', modal).value || 0);
+    const shippingCost = Number(qs<HTMLInputElement>('#s-shipping', modal).value || 0);
+    const memo = qs<HTMLInputElement>('#s-memo', modal).value.trim();
+    if (!productName) return showToast('商品名を入力してください');
+    if (!saleDate) return showToast('売却日を入力してください');
+    if (!Number.isFinite(saleAmount) || saleAmount < 0) return showToast('販売価格を正しく入力してください');
+    const payload = {
+      platform,
+      product_name: productName,
+      sale_date: saleDate,
+      sale_amount: saleAmount,
+      fee,
+      shipping_cost: shippingCost,
+      memo: memo || null,
+    };
+    void (async () => {
+      try {
+        if (isEdit && existing) await Api.updateSale(existing.id, payload);
+        else await Api.createSale(payload);
+        closeModal();
+        showToast(isEdit ? '更新しました' : '登録しました');
+        void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
+      } catch (err) {
+        showToast((err as Error).message);
+      }
+    })();
+  });
+
+  if (isEdit && existing) {
+    qs<HTMLButtonElement>('#s-delete', modal).addEventListener('click', () => {
+      if (!window.confirm(`「${existing.productName}」の売上記録を削除しますか?`)) return;
+      void (async () => {
+        try {
+          await Api.removeSale(existing.id);
+          closeModal();
+          showToast('削除しました');
+          void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
+        } catch (err) {
+          showToast((err as Error).message);
+        }
+      })();
+    });
+  }
+}
+
 // ---- Init ------------------------------------------------------------
 
 // 一部のブラウザ(楽天ブラウザ等)はsvh/dvhの計算に自前のツールバー分の高さを
@@ -1701,6 +1919,7 @@ function init(): void {
 
   qs<HTMLButtonElement>('#fab-add').addEventListener('click', () => {
     if (state.view === 'delivery') openDeliveryForm();
+    else if (state.view === 'sales') openSaleForm();
     else openProductForm();
   });
   qs<HTMLButtonElement>('#manual-barcode-btn').addEventListener('click', () => openManualBarcodeEntry());
@@ -1746,6 +1965,17 @@ function init(): void {
   });
   renderDeliveryCategoryChips();
   void fetchKnownProductNames();
+
+  let salesSearchTimer: number | undefined;
+  qs<HTMLInputElement>('#sales-search').addEventListener('input', (e) => {
+    window.clearTimeout(salesSearchTimer);
+    const value = (e.target as HTMLInputElement).value.trim();
+    salesSearchTimer = window.setTimeout(() => void loadSaleList(value), 250);
+  });
+  qs<HTMLButtonElement>('#refresh-sales').addEventListener('click', (e) => {
+    spinIcon(e.currentTarget as HTMLButtonElement);
+    void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
+  });
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
     state.listSort = (e.target as HTMLSelectElement).value as ListSort;
     void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());

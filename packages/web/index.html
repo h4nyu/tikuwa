@@ -96,6 +96,22 @@
         <ul id="delivery-list" class="tx-list"></ul>
         <p id="delivery-empty" class="empty-state" hidden>まだ記録がありません。</p>
       </section>
+
+      <section id="view-sales" class="view" hidden>
+        <div class="search-bar">
+          <input
+            id="sales-search"
+            type="search"
+            placeholder="商品名・プラットフォーム・メモで検索"
+            autocomplete="off"
+          />
+          <button id="refresh-sales" class="icon-btn" type="button" aria-label="売上一覧を更新">🔄</button>
+        </div>
+        <div id="sales-platform-filter" class="chip-row"></div>
+        <p id="sales-total" class="section-desc"></p>
+        <ul id="sales-list" class="tx-list"></ul>
+        <p id="sales-empty" class="empty-state" hidden>まだ売上記録がありません。</p>
+      </section>
     </main>
 
     <button id="fab-add" class="fab" aria-label="商品を追加">+</button>
@@ -113,6 +129,9 @@
       </button>
       <button class="nav-btn" data-view="delivery" data-title="物流管理">
         <span class="nav-icon">📦</span><span>物流</span>
+      </button>
+      <button class="nav-btn" data-view="sales" data-title="売上記録">
+        <span class="nav-icon">💰</span><span>売上</span>
       </button>
     </nav>
 

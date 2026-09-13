@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { createServer as createHttpsServer } from 'https';
 import { serve } from '@hono/node-server';
-import { openDatabase, SqliteProductRepository, SqliteDeliveryRepository } from '@tikuwa/db';
+import { openDatabase, SqliteProductRepository, SqliteDeliveryRepository, SqliteSaleRepository } from '@tikuwa/db';
 import { createApp } from './app';
 import { env } from './env';
 
@@ -10,7 +10,8 @@ function run(): void {
   const db = openDatabase(env.dbPath);
   const productRepo = SqliteProductRepository(db);
   const deliveryRepo = SqliteDeliveryRepository(db);
-  const app = createApp(productRepo, deliveryRepo, env.webPublicDir);
+  const saleRepo = SqliteSaleRepository(db);
+  const app = createApp(productRepo, deliveryRepo, saleRepo, env.webPublicDir);
 
   const keyPath = path.join(env.certDir, 'key.pem');
   const certPath = path.join(env.certDir, 'cert.pem');

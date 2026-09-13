@@ -60,6 +60,19 @@ export function migrate(db: DatabaseSync): void {
       international_tracking_number TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS sale_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      platform TEXT NOT NULL,
+      product_name TEXT NOT NULL,
+      sale_date TEXT NOT NULL,
+      sale_amount INTEGER NOT NULL,
+      fee INTEGER NOT NULL DEFAULT 0,
+      shipping_cost INTEGER NOT NULL DEFAULT 0,
+      memo TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_sale_records_date ON sale_records(sale_date);
   `);
 
   migrateDeliveryColumns(db);
