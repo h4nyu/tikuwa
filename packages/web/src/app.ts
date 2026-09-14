@@ -1763,9 +1763,15 @@ async function loadSaleList(query?: string): Promise<void> {
     empty.hidden = sales.length > 0;
     empty.textContent = q || state.salePlatform ? '該当する記録がありません。' : 'まだ売上記録がありません。';
 
-    let total = 0;
+    let totalAmount = 0;
+    let totalFee = 0;
+    let totalShipping = 0;
+    let totalNet = 0;
     for (const s of sales) {
-      total += saleNetAmount(s);
+      totalAmount += s.saleAmount;
+      totalFee += s.fee;
+      totalShipping += s.shippingCost;
+      totalNet += saleNetAmount(s);
       const li = el('li', { class: 'delivery-item' });
       const label = [s.productName, `¥${s.saleAmount.toLocaleString()}`, `手数料¥${s.fee.toLocaleString()}`, `送料¥${s.shippingCost.toLocaleString()}`, s.memo]
         .filter((part): part is string => !!part)
@@ -1784,7 +1790,7 @@ async function loadSaleList(query?: string): Promise<void> {
       list.append(li);
     }
     qs<HTMLParagraphElement>('#sales-total').textContent = sales.length
-      ? `表示中 ${sales.length}件・入金見込合計 ¥${total.toLocaleString()}`
+      ? `表示中 ${sales.length}件・販売価格合計 ¥${totalAmount.toLocaleString()}・手数料合計 ¥${totalFee.toLocaleString()}・送料合計 ¥${totalShipping.toLocaleString()}・入金見込合計 ¥${totalNet.toLocaleString()}`
       : '';
 
     for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-edit-sale]'))) {
