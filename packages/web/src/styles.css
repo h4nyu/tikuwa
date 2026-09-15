@@ -343,6 +343,7 @@ html, body {
 }
 
 .form-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.form-row[hidden] { display: none; }
 .form-row label { font-size: 0.82rem; color: var(--text-muted); }
 .form-row input, .form-row select, .form-row textarea {
   padding: 10px 12px;

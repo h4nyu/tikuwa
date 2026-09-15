@@ -1829,18 +1829,18 @@ function openSaleForm(existing?: SaleDto): void {
       <input id="s-product-name" type="text" autocomplete="off" value="${escapeHtml(existing?.productName ?? '')}" />
     </div>
     <div class="form-row">
-      <label for="s-date">売却日</label>
+      <label for="s-date" id="s-date-label">売却日</label>
       <input id="s-date" type="date" value="${existing?.saleDate ?? todayIsoDate()}" />
     </div>
     <div class="form-row">
-      <label for="s-amount">販売価格(税込)</label>
+      <label for="s-amount" id="s-amount-label">販売価格(税込)</label>
       <input id="s-amount" type="number" inputmode="numeric" min="0" value="${existing?.saleAmount ?? ''}" />
     </div>
-    <div class="form-row">
+    <div class="form-row" id="s-fee-row">
       <label for="s-fee">販売手数料</label>
       <input id="s-fee" type="number" inputmode="numeric" min="0" value="${existing?.fee ?? 0}" />
     </div>
-    <div class="form-row">
+    <div class="form-row" id="s-shipping-row">
       <label for="s-shipping">送料(出品者負担分)</label>
       <input id="s-shipping" type="number" inputmode="numeric" min="0" value="${existing?.shippingCost ?? 0}" />
     </div>
@@ -1858,17 +1858,31 @@ function openSaleForm(existing?: SaleDto): void {
     }
   `);
 
+  function updateSaleFormForPlatform(): void {
+    const platform = qs<HTMLSelectElement>('#s-platform', modal).value as SalePlatform;
+    const isDelivery = platform === '納品金額';
+    qs<HTMLLabelElement>('#s-date-label', modal).textContent = isDelivery ? '納品日' : '売却日';
+    qs<HTMLLabelElement>('#s-amount-label', modal).textContent = isDelivery ? '納品価格' : '販売価格(税込)';
+    qs<HTMLDivElement>('#s-fee-row', modal).hidden = isDelivery;
+    qs<HTMLDivElement>('#s-shipping-row', modal).hidden = isDelivery;
+  }
+  updateSaleFormForPlatform();
+  qs<HTMLSelectElement>('#s-platform', modal).addEventListener('change', updateSaleFormForPlatform);
+
   qs<HTMLButtonElement>('#s-submit', modal).addEventListener('click', () => {
     const platform = qs<HTMLSelectElement>('#s-platform', modal).value as SalePlatform;
+    const isDelivery = platform === '納品金額';
     const productName = qs<HTMLInputElement>('#s-product-name', modal).value.trim();
     const saleDate = qs<HTMLInputElement>('#s-date', modal).value;
     const saleAmount = Number(qs<HTMLInputElement>('#s-amount', modal).value);
-    const fee = Number(qs<HTMLInputElement>('#s-fee', modal).value || 0);
-    const shippingCost = Number(qs<HTMLInputElement>('#s-shipping', modal).value || 0);
+    const fee = isDelivery ? 0 : Number(qs<HTMLInputElement>('#s-fee', modal).value || 0);
+    const shippingCost = isDelivery ? 0 : Number(qs<HTMLInputElement>('#s-shipping', modal).value || 0);
     const memo = qs<HTMLInputElement>('#s-memo', modal).value.trim();
     if (!productName) return showToast('商品名を入力してください');
-    if (!saleDate) return showToast('売却日を入力してください');
-    if (!Number.isFinite(saleAmount) || saleAmount < 0) return showToast('販売価格を正しく入力してください');
+    if (!saleDate) return showToast(isDelivery ? '納品日を入力してください' : '売却日を入力してください');
+    if (!Number.isFinite(saleAmount) || saleAmount < 0) {
+      return showToast(isDelivery ? '納品価格を正しく入力してください' : '販売価格を正しく入力してください');
+    }
     const payload = {
       platform,
       product_name: productName,
