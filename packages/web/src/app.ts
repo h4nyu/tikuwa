@@ -234,6 +234,9 @@ function showView(view: ViewName): void {
   for (const section of Array.from(document.querySelectorAll<HTMLElement>('.view'))) {
     section.hidden = section.id !== `view-${view}`;
   }
+  // 全ビューが#view-rootのスクロール位置を共有しているため、タブ切り替え時に
+  // 前のタブでのスクロール量が残ってしまう。切り替えるたびに一覧の先頭に戻す。
+  qs<HTMLElement>('#view-root').scrollTop = 0;
   for (const btn of Array.from(document.querySelectorAll<HTMLButtonElement>('.nav-btn'))) {
     btn.classList.toggle('active', btn.dataset.view === view);
     if (btn.dataset.view === view) qs('#page-title').textContent = btn.dataset.title || '';
