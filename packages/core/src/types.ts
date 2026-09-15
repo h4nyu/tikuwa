@@ -109,7 +109,7 @@ export interface UpdateDeliveryRecordInput {
 }
 
 /** 個人事業主の確定申告向け記帳の元データとして記録する売上のプラットフォーム */
-export const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', 'その他'] as const;
+export const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', '納品金額'] as const;
 export type SalePlatform = (typeof SALE_PLATFORMS)[number];
 
 /** フリマアプリ等で商品が売れた際の売上記録(確定申告の記帳データの元になる) */

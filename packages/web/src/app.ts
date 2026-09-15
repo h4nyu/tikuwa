@@ -58,7 +58,7 @@ interface DeliveryTrackResult {
   delivery: DeliveryDto;
 }
 
-const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', 'その他'] as const;
+const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', '納品金額'] as const;
 type SalePlatform = (typeof SALE_PLATFORMS)[number];
 
 interface SaleDto {
