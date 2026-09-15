@@ -67,6 +67,7 @@ html, body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  overflow-anchor: none;
   padding: 12px 12px calc(var(--nav-height) + 24px);
   -webkit-overflow-scrolling: touch;
 }
