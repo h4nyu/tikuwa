@@ -1749,6 +1749,21 @@ function saleNetAmount(s: SaleDto): number {
   return s.saleAmount - s.fee - s.shippingCost;
 }
 
+// 現在表示中(検索・プラットフォーム絞り込み後)の流水記録を、フリーウェイ経理LITEに
+// 取り込める仕訳データCSV(Shift-JIS)としてサーバー側で生成させ、ダウンロードする。
+function exportFreewayKeiriCsv(): void {
+  const params = new URLSearchParams();
+  const q = qs<HTMLInputElement>('#sales-search').value.trim();
+  if (q) params.set('q', q);
+  if (state.salePlatform) params.set('platform', state.salePlatform);
+  const url = `/api/sales/export/freeway-keiri${params.toString() ? `?${params.toString()}` : ''}`;
+  const a = document.createElement('a');
+  a.href = url;
+  document.body.append(a);
+  a.click();
+  a.remove();
+}
+
 async function loadSaleList(query?: string): Promise<void> {
   const list = qs<HTMLUListElement>('#sales-list');
   const empty = qs<HTMLParagraphElement>('#sales-empty');
@@ -1999,6 +2014,7 @@ function init(): void {
     spinIcon(e.currentTarget as HTMLButtonElement);
     void loadSaleList(qs<HTMLInputElement>('#sales-search').value.trim());
   });
+  qs<HTMLButtonElement>('#export-freeway-keiri').addEventListener('click', () => exportFreewayKeiriCsv());
   qs<HTMLSelectElement>('#list-sort').addEventListener('change', (e) => {
     state.listSort = (e.target as HTMLSelectElement).value as ListSort;
     void loadProductList(qs<HTMLInputElement>('#search-input').value.trim());

@@ -9,6 +9,7 @@
     "@tikuwa/core": "workspace:*",
     "@tikuwa/db": "workspace:*",
     "hono": "^4.13.7",
+    "iconv-lite": "^0.7.0",
     "selfsigned": "^5.5.0"
   }
 }
