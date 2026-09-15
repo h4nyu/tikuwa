@@ -244,7 +244,7 @@ function showView(view: ViewName): void {
 
   qs<HTMLButtonElement>('#fab-add').setAttribute(
     'aria-label',
-    view === 'delivery' ? '記録を追加' : view === 'sales' ? '売上を追加' : '商品を追加'
+    view === 'delivery' ? '記録を追加' : view === 'sales' ? '流水を追加' : '商品を追加'
   );
   qs<HTMLButtonElement>('#fab-text-out').hidden = view !== 'list';
 
@@ -1764,7 +1764,7 @@ async function loadSaleList(query?: string): Promise<void> {
     currentSales = sales;
     list.innerHTML = '';
     empty.hidden = sales.length > 0;
-    empty.textContent = q || state.salePlatform ? '該当する記録がありません。' : 'まだ売上記録がありません。';
+    empty.textContent = q || state.salePlatform ? '該当する記録がありません。' : 'まだ流水記録がありません。';
 
     let totalAmount = 0;
     let totalFee = 0;
@@ -1819,7 +1819,7 @@ function openSaleForm(existing?: SaleDto): void {
     (p) => `<option value="${p}" ${existing?.platform === p ? 'selected' : ''}>${p}</option>`
   ).join('');
   const modal = openModal(`
-    <h2>${isEdit ? '売上記録を編集' : '売上記録を登録'}</h2>
+    <h2>${isEdit ? '流水記録を編集' : '流水記録を登録'}</h2>
     <div class="form-row">
       <label for="s-platform">プラットフォーム</label>
       <select id="s-platform">${platformOptions}</select>
@@ -1893,7 +1893,7 @@ function openSaleForm(existing?: SaleDto): void {
 
   if (isEdit && existing) {
     qs<HTMLButtonElement>('#s-delete', modal).addEventListener('click', () => {
-      if (!window.confirm(`「${existing.productName}」の売上記録を削除しますか?`)) return;
+      if (!window.confirm(`「${existing.productName}」の流水記録を削除しますか?`)) return;
       void (async () => {
         try {
           await Api.removeSale(existing.id);
