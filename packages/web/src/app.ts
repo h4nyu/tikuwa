@@ -37,7 +37,7 @@ interface TransactionDto {
 }
 
 // 発注してから手元に届くまでの4段階。納品記録の「カテゴリ」選択肢としても使う。
-const DELIVERY_STATUSES = ['発注済み', '上海到着', '国際発送', '到着済み'] as const;
+const DELIVERY_STATUSES = ['発注済み', '上海到着', '正定到着', '国際発送', '到着済み'] as const;
 type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 interface DeliveryDto {
