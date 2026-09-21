@@ -51,13 +51,6 @@ interface DeliveryDto {
   createdAt: string;
 }
 
-interface DeliveryTrackResult {
-  state: string | null;
-  stateText: string;
-  latestTrace: { time: string; context: string } | null;
-  delivery: DeliveryDto;
-}
-
 const SALE_PLATFORMS = ['メルカリ', 'PayPayフリマ', '納品金額'] as const;
 type SalePlatform = (typeof SALE_PLATFORMS)[number];
 
@@ -194,7 +187,6 @@ const Api = {
   updateDelivery: (id: number, data: Record<string, unknown>) =>
     api<DeliveryDto>(`/api/deliveries/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   removeDelivery: (id: number) => api<void>(`/api/deliveries/${id}`, { method: 'DELETE' }),
-  trackDelivery: (id: number) => api<DeliveryTrackResult>(`/api/deliveries/${id}/track`, { method: 'POST' }),
   sales: () => api<SaleDto[]>('/api/sales'),
   createSale: (data: Record<string, unknown>) =>
     api<SaleDto>('/api/sales', { method: 'POST', body: JSON.stringify(data) }),
@@ -1392,7 +1384,7 @@ function buildDeliveryItemLi(d: DeliveryDto): HTMLLIElement {
         <input type="checkbox" class="delivery-select-checkbox" data-select-delivery="${d.id}" ${checked} />
         <span>${label}</span>
       </div>
-      <span>${escapeHtml(d.createdAt.slice(5, 16))} ${d.carrier ? `<button class="link-btn" data-track-delivery="${d.id}">照会</button> ` : ''}<button class="link-btn" data-edit-delivery="${d.id}">編集</button></span>
+      <span>${escapeHtml(d.createdAt.slice(5, 16))} <button class="link-btn" data-edit-delivery="${d.id}">編集</button></span>
     </div>
     ${categoryBadge}
   `;
@@ -1468,27 +1460,6 @@ async function loadDeliveryList(query?: string): Promise<void> {
         const id = Number(checkbox.dataset.selectDelivery);
         if (checkbox.checked) selectedDeliveryIds.add(id);
         else selectedDeliveryIds.delete(id);
-      });
-    }
-    for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-track-delivery]'))) {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.trackDelivery);
-        btn.disabled = true;
-        btn.textContent = '照会中…';
-        void (async () => {
-          try {
-            const result = await Api.trackDelivery(id);
-            const traceText = result.latestTrace
-              ? `${result.latestTrace.time.slice(5, 16)} ${result.latestTrace.context}`
-              : '';
-            showToast([result.stateText, traceText].filter(Boolean).join(' / '));
-            void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
-          } catch (err) {
-            showToast((err as Error).message);
-            btn.disabled = false;
-            btn.textContent = '照会';
-          }
-        })();
       });
     }
     for (const btn of Array.from(list.querySelectorAll<HTMLButtonElement>('[data-edit-delivery]'))) {

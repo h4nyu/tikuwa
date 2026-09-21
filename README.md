@@ -61,10 +61,6 @@ cd tikuwa
 # 証明書を生成(初回のみ)
 docker compose run --rm app pnpm run gen-cert
 
-# 快递100APIキーを使う場合は.envを作成(任意。無くても他の機能は動く)
-cp .env.example .env
-# .envをエディタで開いてKUAIDI100_CUSTOMER・KUAIDI100_KEYを設定
-
 # 本番起動(再起動しても自動復帰する)
 docker compose up -d --build tikuwa
 ```
@@ -113,7 +109,6 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 | POST | `/api/deliveries` | 納品記録を追加(`product_name`・`tracking_number`・`carrier`(任意)・`category`(任意)・`international_tracking_number`(任意)) |
 | PUT | `/api/deliveries/:id` | 納品記録を編集(`product_name`・`tracking_number`・`carrier`・`category`・`international_tracking_number`) |
 | PATCH | `/api/deliveries/:id/status` | 納品記録の状態を更新(`status`)。現在UIからは呼び出していない内部用API |
-| POST | `/api/deliveries/:id/track` | 快递100APIで物流状況を照会し、署名確認済みなら上海到着に自動更新 |
 | DELETE | `/api/deliveries/:id` | 納品記録を削除 |
 
 ## 物流管理
@@ -145,20 +140,6 @@ SQLiteのコネクションやカメラ絡みの状態が不安定になる可�
 「全削除」でまとめてオフにできる。その下の「選択した項目を統一編集」ボタンでは、チェックした記録の
 運送会社・カテゴリ・国際追跡番号をまとめて同じ値に変更できるモーダルが開く(空欄のままの項目は
 変更されない)。CSV書き出し・統一編集はこのチェックボックスの選択状態を使い、実行後は選択が解除される。
-
-運送会社が入力されている記録には一覧に「照会」リンクが表示され、タップすると
-[快递100(kuaidi100.com)](https://www.kuaidi100.com/)の物流照会APIで実際の配送状況を取得できる
-(結果はトースト通知で表示)。中国国内の配送が「署名確認済み」であれば、カテゴリが
-「発注済み」または未設定のときに限り自動的に「上海到着」に更新される。運送会社名は
-顺丰・中通・圆通・韵达・申通・邮政(EMS)・极兔・天天・百世・德邦・京东のいずれかの表記
-(中国語)である必要がある。顺丰・中通は快递100の仕様上、照会に電話番号が必要になる場合がある
-(このアプリでは電話番号を保持していないため、その場合は照会が失敗する)。
-
-利用には快递100のAPIキーが必要。[api.kuaidi100.com](https://api.kuaidi100.com/)でユーザー登録後、
-企業版の実時査询サービスを申请すると`customer`(企业授权码)と`key`(授权密钥)が発行される。
-取得したら`.env.example`を`.env`にコピーして値を設定する(`.env`はgit管理外なのでキーが
-リポジトリに含まれることはない)。APIキーが未設定の場合、「照会」ボタンはエラーメッセージを
-表示するだけで安全に失敗する。
 
 ## 複数バーコード(箱・ケース対応)
 
