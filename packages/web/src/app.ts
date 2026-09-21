@@ -37,7 +37,7 @@ interface TransactionDto {
 }
 
 // 発注してから手元に届くまでの4段階。納品記録の「カテゴリ」選択肢としても使う。
-const DELIVERY_STATUSES = ['発注済み', '上海到着', '正定到着', '国際発送', '到着済み'] as const;
+const DELIVERY_STATUSES = ['発注済み', '上海到着', '正定到着', '国際発送', '到着済み', '家'] as const;
 type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 interface DeliveryDto {
@@ -375,12 +375,6 @@ function renderDeliveryCategoryChips(): void {
     renderDeliveryCategoryChips();
     void loadDeliveryList(qs<HTMLInputElement>('#delivery-search').value.trim());
   };
-
-  const allChip = el('button', { class: `chip${state.deliveryCategory === '' ? ' active' : ''}`, type: 'button' }, [
-    'すべて',
-  ]);
-  allChip.addEventListener('click', () => selectCategory(''));
-  bar.append(allChip);
 
   for (const cat of DELIVERY_STATUSES) {
     const chip = el('button', { class: `chip${state.deliveryCategory === cat ? ' active' : ''}`, type: 'button' }, [
