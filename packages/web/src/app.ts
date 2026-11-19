@@ -150,16 +150,39 @@ function attachSuggestions(input: HTMLInputElement, suggestionBox: HTMLDivElemen
 
 // ---- API ---------------------------------------------------------------
 
+// レスポンスのステータスで分岐したい呼び出し元(スキャン成功時の404判定など)のために
+// ステータスコードを持たせておく。タイムアウト・通信断の場合はstatusがundefinedになる。
+class ApiError extends Error {
+  constructor(message: string, readonly status?: number) {
+    super(message);
+  }
+}
+
+const API_TIMEOUT_MS = 8000;
+
 async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if ((err as Error).name === 'AbortError') {
+      throw new ApiError('通信がタイムアウトしました。電波状況を確認してもう一度お試しください');
+    }
+    throw new ApiError('サーバーに接続できませんでした。ネットワーク状況を確認してください');
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const message = (body && (body as { message?: string }).message) || `エラーが発生しました (${res.status})`;
-    throw new Error(message);
+    throw new ApiError(message, res.status);
   }
   return body as T;
 }
@@ -749,10 +772,10 @@ function txLabel(type: TransactionDto['type']): string {
   return type === 'in' ? '入庫' : type === 'out' ? '出庫' : '調整';
 }
 
-async function openProductDetail(id: number): Promise<void> {
+async function openProductDetail(id: number, prefillQty = 1): Promise<void> {
   try {
     const [product, txs] = await Promise.all([Api.byId(id), Api.transactions(id)]);
-    renderProductDetail(product, txs);
+    renderProductDetail(product, txs, prefillQty);
   } catch (err) {
     showToast((err as Error).message);
   }
@@ -773,7 +796,7 @@ function barcodeListHtml(p: ProductDto): string {
     .join('');
 }
 
-function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
+function renderProductDetail(p: ProductDto, txs: TransactionDto[], prefillQty = 1): void {
   const modal = openModal(`
     <h2>${escapeHtml(p.name)}</h2>
     <p class="product-meta">${escapeHtml(productMetaLine(p))}</p>
@@ -798,7 +821,7 @@ function renderProductDetail(p: ProductDto, txs: TransactionDto[]): void {
       </div>
       <div class="form-row">
         <label for="tx-qty">数量</label>
-        <input id="tx-qty" type="number" inputmode="numeric" min="0" value="1" />
+        <input id="tx-qty" type="number" inputmode="numeric" min="0" value="${prefillQty}" />
       </div>
     </div>
     <div class="form-row">
@@ -1298,12 +1321,18 @@ async function onScanSuccess(code: string): Promise<void> {
   }
   qs<HTMLParagraphElement>('#scan-hint').hidden = true;
 
-  resumeScanningOnModalClose = resumeScanning;
   try {
     const match = await Api.byBarcode(code);
-    void openProductDetail(match.id);
-  } catch {
-    openProductForm(undefined, code);
+    resumeScanningOnModalClose = resumeScanning;
+    void openProductDetail(match.id, match.matchedBarcode.quantityPerScan);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) {
+      resumeScanningOnModalClose = resumeScanning;
+      openProductForm(undefined, code);
+    } else {
+      showToast(err instanceof Error ? err.message : 'エラーが発生しました');
+      resumeScanning();
+    }
   }
 }
 
